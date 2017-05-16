@@ -45,6 +45,9 @@
 	#include <linux/semaphore.h>
 #endif
 #include <linux/signal.h>
+#if (LINUX_VERSION_CODE >= KERNEL_VERSION(4, 11, 0))
+        #include <linux/sched/signal.h>
+#endif
 #include <linux/sem.h>
 #include <linux/sched.h>
 #include <linux/etherdevice.h>
