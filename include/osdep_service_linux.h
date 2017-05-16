@@ -44,6 +44,7 @@
 #else
 	#include <linux/semaphore.h>
 #endif
+#include <linux/signal.h>
 #include <linux/sem.h>
 #include <linux/sched.h>
 #include <linux/etherdevice.h>
