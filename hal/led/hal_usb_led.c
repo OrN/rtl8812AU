@@ -1,6 +1,6 @@
 /******************************************************************************
  *
- * Copyright(c) 2007 - 2012 Realtek Corporation. All rights reserved.
+ * Copyright(c) 2007 - 2017 Realtek Corporation.
  *
  * This program is free software; you can redistribute it and/or modify it
  * under the terms of version 2 of the GNU General Public License as
@@ -11,15 +11,29 @@
  * FITNESS FOR A PARTICULAR PURPOSE. See the GNU General Public License for
  * more details.
  *
- * You should have received a copy of the GNU General Public License along with
- * this program; if not, write to the Free Software Foundation, Inc.,
- * 51 Franklin Street, Fifth Floor, Boston, MA 02110, USA
- *
- *
- ******************************************************************************/
+ *****************************************************************************/
 
 #include <drv_types.h>
 #include <hal_data.h>
+#ifdef CONFIG_RTW_SW_LED
+
+#ifdef CONFIG_LED_CONTROL
+void
+rtw_led_control(
+  _adapter *adapter,
+  LED_CTL_MODE LedAction
+)
+{
+  if (adapter->registrypriv.led_enable)
+  {
+    do
+    {
+      (adapter)->ledpriv.LedControlHandler((adapter), (LedAction));
+    }
+    while(0);
+  }
+}
+#endif //CONFIG_LED_CONTROL
 
 /*
  *	Description:
@@ -1840,7 +1854,7 @@ void BlinkTimerCallback(void *data)
 		return;
 	}
 
-#ifdef CONFIG_LED_HANDLED_BY_CMD_THREAD
+#ifdef CONFIG_RTW_LED_HANDLED_BY_CMD_THREAD
 	rtw_led_blink_cmd(padapter, (PVOID)pLed);
 #else
 	_set_workitem(&(pLed->BlinkWorkItem));
@@ -4285,3 +4299,4 @@ DeInitLed(
 	_cancel_timer_ex(&(pLed->BlinkTimer));
 	ResetLedStatus(pLed);
 }
+#endif

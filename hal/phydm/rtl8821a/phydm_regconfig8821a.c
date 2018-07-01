@@ -27,7 +27,7 @@ void odm_config_rf_reg_8821a(
 	struct PHY_DM_STRUCT				*p_dm_odm,
 	u32					addr,
 	u32					data,
-	enum odm_rf_radio_path_e     RF_PATH,
+	enum rf_path     RF_PATH,
 	u32				    reg_addr
 )
 {
@@ -77,7 +77,7 @@ odm_config_rf_radio_a_8821a(
 	u32  content = 0x1000; /* RF_Content: radioa_txt */
 	u32	maskfor_phy_set = (u32)(content & 0xE000);
 
-	odm_config_rf_reg_8821a(p_dm_odm, addr, data, ODM_RF_PATH_A, addr | maskfor_phy_set);
+	odm_config_rf_reg_8821a(p_dm_odm, addr, data, RF_PATH_A, addr | maskfor_phy_set);
 
     ODM_RT_TRACE(p_dm_odm,ODM_COMP_INIT, ODM_DBG_TRACE, ("===> ODM_ConfigRFWithHeaderFile: [RadioA] %08X %08X\n", addr, data));
 }
@@ -92,7 +92,7 @@ odm_config_rf_radio_b_8821a(
 	u32  content = 0x1001; /* RF_Content: radiob_txt */
 	u32	maskfor_phy_set = (u32)(content & 0xE000);
 
-	odm_config_rf_reg_8821a(p_dm_odm, addr, data, ODM_RF_PATH_B, addr | maskfor_phy_set);
+	odm_config_rf_reg_8821a(p_dm_odm, addr, data, RF_PATH_B, addr | maskfor_phy_set);
 
 	ODM_RT_TRACE(p_dm_odm, ODM_COMP_INIT, ODM_DBG_TRACE, ("===> odm_config_rf_with_header_file: [RadioB] %08X %08X\n", addr, data));
 

@@ -1,3 +1,17 @@
+/******************************************************************************
+ *
+ * Copyright(c) 2016 - 2017 Realtek Corporation.
+ *
+ * This program is free software; you can redistribute it and/or modify it
+ * under the terms of version 2 of the GNU General Public License as
+ * published by the Free Software Foundation.
+ *
+ * This program is distributed in the hope that it will be useful, but WITHOUT
+ * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
+ * FITNESS FOR A PARTICULAR PURPOSE. See the GNU General Public License for
+ * more details.
+ *
+ *****************************************************************************/
 #ifndef __HAL_TXBF_INTERFACE_H__
 #define __HAL_TXBF_INTERFACE_H__
 
@@ -29,7 +43,7 @@ boolean
 send_fw_ht_ndpa_packet(
 	void			*p_dm_void,
 	u8			*RA,
-	CHANNEL_WIDTH	BW
+	enum channel_width	BW
 );
 
 boolean
@@ -37,7 +51,7 @@ send_fw_vht_ndpa_packet(
 	void			*p_dm_void,
 	u8			*RA,
 	u16			AID,
-	CHANNEL_WIDTH	BW
+	enum channel_width	BW
 );
 
 boolean
@@ -45,14 +59,14 @@ send_sw_vht_ndpa_packet(
 	void			*p_dm_void,
 	u8			*RA,
 	u16			AID,
-	CHANNEL_WIDTH	BW
+	enum channel_width	BW
 );
 
 boolean
 send_sw_ht_ndpa_packet(
 	void			*p_dm_void,
 	u8			*RA,
-	CHANNEL_WIDTH	BW
+	enum channel_width	BW
 );
 
 #if (SUPPORT_MU_BF == 1)
@@ -80,7 +94,7 @@ send_sw_vht_bf_report_poll(
 boolean
 send_sw_vht_mu_ndpa_packet(
 	void			*p_dm_void,
-	CHANNEL_WIDTH	BW
+	enum channel_width	BW
 );
 #else
 #define beamforming_get_vht_gid_mgnt_frame(adapter, p_rfd, p_pdu_os) RT_STATUS_FAILURE
@@ -102,14 +116,14 @@ boolean
 send_fw_ht_ndpa_packet(
 	void			*p_dm_void,
 	u8			*RA,
-	CHANNEL_WIDTH	BW
+	enum channel_width	BW
 );
 
 boolean
 send_sw_ht_ndpa_packet(
 	void			*p_dm_void,
 	u8			*RA,
-	CHANNEL_WIDTH	BW
+	enum channel_width	BW
 );
 
 boolean
@@ -117,7 +131,7 @@ send_fw_vht_ndpa_packet(
 	void			*p_dm_void,
 	u8			*RA,
 	u16			AID,
-	CHANNEL_WIDTH	BW
+	enum channel_width	BW
 );
 
 boolean
@@ -125,7 +139,7 @@ send_sw_vht_ndpa_packet(
 	void			*p_dm_void,
 	u8			*RA,
 	u16			AID,
-	CHANNEL_WIDTH	BW
+	enum channel_width	BW
 );
 #endif
 
@@ -142,11 +156,11 @@ beamforming_get_ndpa_frame(
 boolean
 dbg_send_sw_vht_mundpa_packet(
 	void			*p_dm_void,
-	CHANNEL_WIDTH	BW
+	enum channel_width	BW
 );
 
 #else
-#define beamforming_get_ndpa_frame(p_dm_odm, _pdu_os)
+#define beamforming_get_ndpa_frame(p_dm, _pdu_os)
 #if (DM_ODM_SUPPORT_TYPE == ODM_CE)
 	#define beamforming_get_report_frame(adapter, precv_frame)		RT_STATUS_FAILURE
 #elif (DM_ODM_SUPPORT_TYPE == ODM_WIN)

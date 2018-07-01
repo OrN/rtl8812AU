@@ -1,6 +1,6 @@
 /******************************************************************************
  *
- * Copyright(c) 2007 - 2011 Realtek Corporation. All rights reserved.
+ * Copyright(c) 2007 - 2017 Realtek Corporation.
  *
  * This program is free software; you can redistribute it and/or modify it
  * under the terms of version 2 of the GNU General Public License as
@@ -11,12 +11,7 @@
  * FITNESS FOR A PARTICULAR PURPOSE. See the GNU General Public License for
  * more details.
  *
- * You should have received a copy of the GNU General Public License along with
- * this program; if not, write to the Free Software Foundation, Inc.,
- * 51 Franklin Street, Fifth Floor, Boston, MA 02110, USA
- *
- *
- ******************************************************************************/
+ *****************************************************************************/
 #ifndef __RTW_CMD_H_
 #define __RTW_CMD_H_
 
@@ -210,6 +205,15 @@ u8 p2p_roch_cmd(_adapter *adapter
 	, u8 flags
 );
 u8 p2p_cancel_roch_cmd(_adapter *adapter, u64 cookie, struct wireless_dev *wdev, u8 flags);
+
+struct mgnt_tx_parm {
+	u8 tx_ch;
+	u8 no_cck;
+	const u8 *buf;
+	size_t len;
+	int wait_ack;
+};
+u8 rtw_mgnt_tx_cmd(_adapter *adapter, u8 tx_ch, u8 no_cck, const u8 *buf, size_t len, int wait_ack, u8 flags);
 #endif /* CONFIG_IOCTL_CFG80211 */
 #endif /* CONFIG_P2P */
 
@@ -245,7 +249,10 @@ enum rtw_drvextra_cmd_id {
 	TEST_H2C_CID,
 	MP_CMD_WK_CID,
 	CUSTOMER_STR_WK_CID,
-	SET_SECURITYPRIV,
+#ifdef CONFIG_RTW_REPEATER_SON
+	RSON_SCAN_WK_CID,
+#endif
+	MGNT_TX_WK_CID,
 	MAX_WK_CID
 };
 
@@ -986,6 +993,7 @@ Result:
 #define H2C_RESERVED			0x07
 #define H2C_ENQ_HEAD			0x08
 #define H2C_ENQ_HEAD_FAIL		0x09
+#define H2C_CMD_FAIL			0x0A
 
 extern u8 rtw_setassocsta_cmd(_adapter  *padapter, u8 *mac_addr);
 extern u8 rtw_setstandby_cmd(_adapter *padapter, uint action);
@@ -1030,7 +1038,7 @@ extern u8 rtw_dynamic_chk_wk_cmd(_adapter *adapter);
 u8 rtw_lps_ctrl_wk_cmd(_adapter *padapter, u8 lps_ctrl_type, u8 enqueue);
 u8 rtw_dm_in_lps_wk_cmd(_adapter *padapter);
 u8 rtw_lps_change_dtim_cmd(_adapter *padapter, u8 dtim);
-u8 rtw_set_securitypriv_cmd(_adapter *padapter, u8 *sme);
+
 #if (RATE_ADAPTIVE_SUPPORT == 1)
 u8 rtw_rpt_timer_cfg_cmd(_adapter *padapter, u16 minRptTime);
 #endif
@@ -1050,13 +1058,6 @@ u8 rtw_dfs_master_cmd(_adapter *adapter, bool enqueue);
 void rtw_dfs_master_timer_hdl(void *ctx);
 void rtw_dfs_master_enable(_adapter *adapter, u8 ch, u8 bw, u8 offset);
 void rtw_dfs_master_disable(_adapter *adapter, u8 ch, u8 bw, u8 offset, bool by_others);
-enum {
-	MLME_STA_CONNECTING,
-	MLME_STA_CONNECTED,
-	MLME_STA_DISCONNECTED,
-	MLME_AP_STARTED,
-	MLME_AP_STOPPED,
-};
 void rtw_dfs_master_status_apply(_adapter *adapter, u8 self_action);
 #endif /* CONFIG_DFS_MASTER */
 #endif /* CONFIG_AP_MODE */
@@ -1069,7 +1070,7 @@ u8 rtw_test_h2c_cmd(_adapter *adapter, u8 *buf, u8 len);
 
 u8 rtw_enable_hw_update_tsf_cmd(_adapter *padapter);
 
-u8 rtw_set_ch_cmd(_adapter *padapter, u8 ch, u8 bw, u8 ch_offset, u8 enqueue);
+u8 rtw_set_chbw_cmd(_adapter *padapter, u8 ch, u8 bw, u8 ch_offset, u8 flags);
 
 u8 rtw_set_chplan_cmd(_adapter *adapter, int flags, u8 chplan, u8 swconfig);
 u8 rtw_set_country_cmd(_adapter *adapter, int flags, const char *country_code, u8 swconfig);
@@ -1090,6 +1091,12 @@ u8 rtw_c2h_reg_wk_cmd(_adapter *adapter, u8 *c2h_evt);
 #endif
 #ifdef CONFIG_FW_C2H_PKT
 u8 rtw_c2h_packet_wk_cmd(_adapter *adapter, u8 *c2h_evt, u16 length);
+#endif
+
+#ifdef CONFIG_RTW_REPEATER_SON
+#define RSON_SCAN_PROCESS		10
+#define RSON_SCAN_DISABLE		11
+u8 rtw_rson_scan_wk_cmd(_adapter *adapter, int op);
 #endif
 
 u8 rtw_run_in_thread_cmd(PADAPTER padapter, void (*func)(void *), void *context);

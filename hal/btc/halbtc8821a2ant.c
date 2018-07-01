@@ -1,3 +1,17 @@
+/******************************************************************************
+ *
+ * Copyright(c) 2016 - 2017 Realtek Corporation.
+ *
+ * This program is free software; you can redistribute it and/or modify it
+ * under the terms of version 2 of the GNU General Public License as
+ * published by the Free Software Foundation.
+ *
+ * This program is distributed in the hope that it will be useful, but WITHOUT
+ * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
+ * FITNESS FOR A PARTICULAR PURPOSE. See the GNU General Public License for
+ * more details.
+ *
+ *****************************************************************************/
 /* ************************************************************
  * Description:
  *
@@ -31,8 +45,8 @@ const char *const glbt_info_src_8821a_2ant[] = {
 	"BT Info[bt auto report]",
 };
 
-u32	glcoex_ver_date_8821a_2ant = 20161128;
-u32	glcoex_ver_8821a_2ant = 0x60;
+u32	glcoex_ver_date_8821a_2ant = 20161130;
+u32	glcoex_ver_8821a_2ant = 0x61;
 u32	glcoex_ver_btdesired_8821a_2ant = 0x5c;
 
 /* modify 20140903v43 a2dpandhid tdmaonoff a2dp glitch _ tdma off 778=3(case1)->778=1(case0)
@@ -2933,8 +2947,8 @@ void halbtc8821a2ant_action_a2dp(IN struct btc_coexist *btcoexist)
 
 		halbtc8821a2ant_coex_table_with_type(btcoexist, NORMAL_EXEC, 0);
 
-		/* halbtc8821a2ant_ps_tdma(btcoexist, NORMAL_EXEC, false, 1); */
-		halbtc8821a2ant_ps_tdma(btcoexist, NORMAL_EXEC, true, 23);
+		halbtc8821a2ant_ps_tdma(btcoexist, NORMAL_EXEC, false, 1);
+		/* halbtc8821a2ant_ps_tdma(btcoexist, NORMAL_EXEC, true, 23); */
 
 		/* sw mechanism */
 		btcoexist->btc_get(btcoexist, BTC_GET_U4_WIFI_BW, &wifi_bw);
@@ -2963,6 +2977,12 @@ void halbtc8821a2ant_action_a2dp(IN struct btc_coexist *btcoexist)
 	else
 		halbtc8821a2ant_dec_bt_pwr(btcoexist, NORMAL_EXEC, 0);
 
+	if (BTC_RSSI_HIGH(wifi_rssi_state1) && BTC_RSSI_HIGH(bt_rssi_state)) {
+		halbtc8821a2ant_coex_table_with_type(btcoexist, NORMAL_EXEC, 7);
+	} else {
+		halbtc8821a2ant_coex_table_with_type(btcoexist, NORMAL_EXEC,
+						     13);
+	}
 
 	if ((bt_rssi_state == BTC_RSSI_STATE_HIGH) ||
 	    (bt_rssi_state == BTC_RSSI_STATE_STAY_HIGH)) {

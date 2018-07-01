@@ -110,7 +110,7 @@ struct _RT_BEAMFORM_STAINFO {
 	u16						mac_id;
 	u8						my_mac_addr[6];
 	WIRELESS_MODE				wireless_mode;
-	CHANNEL_WIDTH				bw;
+	enum channel_width				bw;
 	enum beamforming_cap			beamform_cap;
 	u8						ht_beamform_cap;
 	u16						vht_beamform_cap;
@@ -126,10 +126,10 @@ struct _RT_BEAMFORMEE_ENTRY {
 	u16	aid;				/*Used to construct AID field of NDPA packet.*/
 	u16	mac_id;				/*Used to Set Reg42C in IBSS mode. */
 	u16	p_aid;				/*Used to fill Reg42C & Reg714 to compare with P_AID of Tx DESC. */
-	u16	g_id;				/*Used to fill Tx DESC*/
+	u8	g_id;				/*Used to fill Tx DESC*/
 	u8	my_mac_addr[6];
 	u8	mac_addr[6];			/*Used to fill Reg6E4 to fill Mac address of CSI report frame.*/
-	CHANNEL_WIDTH			sound_bw;		/*Sounding band_width*/
+	enum channel_width			sound_bw;		/*Sounding band_width*/
 	u16					sound_period;
 	enum beamforming_cap			beamform_entry_cap;
 	enum beamforming_entry_state	beamform_entry_state;
@@ -155,7 +155,7 @@ struct _RT_BEAMFORMER_ENTRY {
 	boolean			is_used;
 	/*P_AID of BFer entry is probably not used*/
 	u16				p_aid;					/*Used to fill Reg42C & Reg714 to compare with P_AID of Tx DESC. */
-	u16				g_id;
+	u8				g_id;
 	u8				my_mac_addr[6];
 	u8				mac_addr[6];
 	enum beamforming_cap		beamform_entry_cap;
@@ -175,7 +175,7 @@ struct _RT_BEAMFORMER_ENTRY {
 
 struct _RT_SOUNDING_INFO {
 	u8			sound_idx;
-	CHANNEL_WIDTH	sound_bw;
+	enum channel_width	sound_bw;
 	enum sounding_mode	sound_mode;
 	u16			sound_period;
 };
@@ -184,7 +184,7 @@ struct _RT_SOUNDING_INFO {
 
 struct _RT_BEAMFORMING_OID_INFO {
 	u8			sound_oid_idx;
-	CHANNEL_WIDTH	sound_oid_bw;
+	enum channel_width	sound_oid_bw;
 	enum sounding_mode	sound_oid_mode;
 	u16			sound_oid_period;
 };
@@ -227,6 +227,8 @@ struct _RT_BEAMFORMING_INFO {
 #endif
 	/* Control register */
 	u32					reg_mu_tx_ctrl;		/* For USB/SDIO interfaces aync I/O */
+	u8					tx_bf_data_rate;
+	u8					last_usb_hub;
 };
 
 
@@ -321,6 +323,10 @@ phydm_beamforming_get_beam_cap(
 	struct _RT_BEAMFORMING_INFO	*p_beam_info
 );
 
+enum beamforming_cap
+phydm_get_beamform_cap(
+	void			*p_dm_void
+);
 
 boolean
 beamforming_control_v1(
@@ -328,7 +334,7 @@ beamforming_control_v1(
 	u8			*RA,
 	u8			AID,
 	u8			mode,
-	CHANNEL_WIDTH	BW,
+	enum channel_width	BW,
 	u8			rate
 );
 
@@ -338,7 +344,7 @@ phydm_beamforming_control_v2(
 	void		*p_dm_void,
 	u8			idx,
 	u8			mode,
-	CHANNEL_WIDTH	BW,
+	enum channel_width	BW,
 	u16			period
 );
 
@@ -360,7 +366,7 @@ boolean
 beamforming_send_ht_ndpa_packet(
 	void			*p_dm_void,
 	u8			*RA,
-	CHANNEL_WIDTH	BW,
+	enum channel_width	BW,
 	u8			q_idx
 );
 
@@ -370,24 +376,24 @@ beamforming_send_vht_ndpa_packet(
 	void			*p_dm_void,
 	u8			*RA,
 	u16			AID,
-	CHANNEL_WIDTH	BW,
+	enum channel_width	BW,
 	u8			q_idx
 );
 
 #else
 #define beamforming_gid_paid(adapter, p_tcb)
-#define	phydm_acting_determine(p_dm_odm, type)	false
-#define beamforming_enter(p_dm_odm, sta_idx)
-#define beamforming_leave(p_dm_odm, RA)
-#define beamforming_end_fw(p_dm_odm)
-#define beamforming_control_v1(p_dm_odm, RA, AID, mode, BW, rate)		true
-#define beamforming_control_v2(p_dm_odm, idx, mode, BW, period)		true
-#define phydm_beamforming_end_sw(p_dm_odm, _status)
-#define beamforming_timer_callback(p_dm_odm)
-#define phydm_beamforming_init(p_dm_odm)
-#define phydm_beamforming_control_v2(p_dm_odm, _idx, _mode, _BW, _period)	false
-#define beamforming_watchdog(p_dm_odm)
-#define phydm_beamforming_watchdog(p_dm_odm)
+#define	phydm_acting_determine(p_dm, type)	false
+#define beamforming_enter(p_dm, sta_idx)
+#define beamforming_leave(p_dm, RA)
+#define beamforming_end_fw(p_dm)
+#define beamforming_control_v1(p_dm, RA, AID, mode, BW, rate)		true
+#define beamforming_control_v2(p_dm, idx, mode, BW, period)		true
+#define phydm_beamforming_end_sw(p_dm, _status)
+#define beamforming_timer_callback(p_dm)
+#define phydm_beamforming_init(p_dm)
+#define phydm_beamforming_control_v2(p_dm, _idx, _mode, _BW, _period)	false
+#define beamforming_watchdog(p_dm)
+#define phydm_beamforming_watchdog(p_dm)
 
 
 #endif

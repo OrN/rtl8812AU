@@ -1,6 +1,6 @@
 /******************************************************************************
  *
- * Copyright(c) 2007 - 2011 Realtek Corporation. All rights reserved.
+ * Copyright(c) 2007 - 2017 Realtek Corporation.
  *
  * This program is free software; you can redistribute it and/or modify it
  * under the terms of version 2 of the GNU General Public License as
@@ -11,12 +11,7 @@
  * FITNESS FOR A PARTICULAR PURPOSE. See the GNU General Public License for
  * more details.
  *
- * You should have received a copy of the GNU General Public License along with
- * this program; if not, write to the Free Software Foundation, Inc.,
- * 51 Franklin Street, Fifth Floor, Boston, MA 02110, USA
- *
- *
- ******************************************************************************/
+ *****************************************************************************/
 #define _RTW_P2P_C_
 
 #include <drv_types.h>
@@ -85,7 +80,7 @@ static u32 go_add_group_info_attr(struct wifidirect_info *pwdinfo, u8 *pbuf)
 			pcur += ETH_ALEN;
 
 			/* P2P interface address */
-			_rtw_memcpy(pcur, psta->hwaddr, ETH_ALEN);
+			_rtw_memcpy(pcur, psta->cmn.mac_addr, ETH_ALEN);
 			pcur += ETH_ALEN;
 
 			*pcur = psta->dev_cap;
@@ -757,6 +752,7 @@ u32 build_probe_resp_wfd_ie(struct wifidirect_info *pwdinfo, u8 *pbuf, u8 tunnel
 	_adapter *padapter = pwdinfo->padapter;
 	struct mlme_priv		*pmlmepriv = &padapter->mlmepriv;
 	struct wifi_display_info	*pwfd_info = padapter->wdinfo.wfd_info;
+	u16 v16 = 0;
 
 	if (!hal_chk_wl_func(padapter, WL_FUNC_MIRACAST))
 		goto exit;
@@ -794,36 +790,43 @@ u32 build_probe_resp_wfd_ie(struct wifidirect_info *pwdinfo, u8 *pbuf, u8 tunnel
 			if (is_any_client_associated(pwdinfo->padapter)) {
 				if (pwdinfo->wfd_tdls_enable) {
 					/*	TDLS mode + WSD ( WFD Service Discovery ) */
-					RTW_PUT_BE16(wfdie + wfdielen, pwfd_info->wfd_device_type | WFD_DEVINFO_WSD | WFD_DEVINFO_PC_TDLS | WFD_DEVINFO_HDCP_SUPPORT);
+					v16 = pwfd_info->wfd_device_type | WFD_DEVINFO_WSD | WFD_DEVINFO_PC_TDLS | WFD_DEVINFO_HDCP_SUPPORT;
+					RTW_PUT_BE16(wfdie + wfdielen, v16);
 				} else {
 					/*	WiFi Direct mode + WSD ( WFD Service Discovery ) */
-					RTW_PUT_BE16(wfdie + wfdielen, pwfd_info->wfd_device_type | WFD_DEVINFO_WSD | WFD_DEVINFO_HDCP_SUPPORT);
+					v16 =  pwfd_info->wfd_device_type | WFD_DEVINFO_WSD | WFD_DEVINFO_HDCP_SUPPORT;
+					RTW_PUT_BE16(wfdie + wfdielen, v16);
 				}
 			} else {
 				if (pwdinfo->wfd_tdls_enable) {
 					/*	available for WFD session + TDLS mode + WSD ( WFD Service Discovery ) */
-					RTW_PUT_BE16(wfdie + wfdielen, pwfd_info->wfd_device_type | WFD_DEVINFO_SESSION_AVAIL | WFD_DEVINFO_WSD | WFD_DEVINFO_PC_TDLS | WFD_DEVINFO_HDCP_SUPPORT);
+					v16 = pwfd_info->wfd_device_type | WFD_DEVINFO_SESSION_AVAIL | WFD_DEVINFO_WSD | WFD_DEVINFO_PC_TDLS | WFD_DEVINFO_HDCP_SUPPORT;
+					RTW_PUT_BE16(wfdie + wfdielen, v16);
 				} else {
 					/*	available for WFD session + WiFi Direct mode + WSD ( WFD Service Discovery ) */
-					RTW_PUT_BE16(wfdie + wfdielen, pwfd_info->wfd_device_type | WFD_DEVINFO_SESSION_AVAIL | WFD_DEVINFO_WSD | WFD_DEVINFO_HDCP_SUPPORT);
+					v16 = pwfd_info->wfd_device_type | WFD_DEVINFO_SESSION_AVAIL | WFD_DEVINFO_WSD | WFD_DEVINFO_HDCP_SUPPORT;
+					RTW_PUT_BE16(wfdie + wfdielen, v16);
 				}
 			}
 		} else {
 			if (pwdinfo->wfd_tdls_enable) {
 				/*	available for WFD session + WiFi Direct mode + WSD ( WFD Service Discovery ) */
-				RTW_PUT_BE16(wfdie + wfdielen, pwfd_info->wfd_device_type | WFD_DEVINFO_SESSION_AVAIL | WFD_DEVINFO_WSD | WFD_DEVINFO_PC_TDLS | WFD_DEVINFO_HDCP_SUPPORT);
+				v16 = pwfd_info->wfd_device_type | WFD_DEVINFO_SESSION_AVAIL | WFD_DEVINFO_WSD | WFD_DEVINFO_PC_TDLS | WFD_DEVINFO_HDCP_SUPPORT;
+				RTW_PUT_BE16(wfdie + wfdielen, v16);
 			} else {
-
 				/*	available for WFD session + WiFi Direct mode + WSD ( WFD Service Discovery ) */
-				RTW_PUT_BE16(wfdie + wfdielen, pwfd_info->wfd_device_type | WFD_DEVINFO_SESSION_AVAIL | WFD_DEVINFO_WSD | WFD_DEVINFO_HDCP_SUPPORT);
+				v16 =  pwfd_info->wfd_device_type | WFD_DEVINFO_SESSION_AVAIL | WFD_DEVINFO_WSD | WFD_DEVINFO_HDCP_SUPPORT;
+				RTW_PUT_BE16(wfdie + wfdielen, v16);
 			}
 		}
 	} else {
-		if (pwdinfo->wfd_tdls_enable)
-			RTW_PUT_BE16(wfdie + wfdielen, pwfd_info->wfd_device_type | WFD_DEVINFO_WSD | WFD_DEVINFO_PC_TDLS | WFD_DEVINFO_HDCP_SUPPORT);
-		else
-			RTW_PUT_BE16(wfdie + wfdielen, pwfd_info->wfd_device_type | WFD_DEVINFO_WSD | WFD_DEVINFO_HDCP_SUPPORT);
-
+		if (pwdinfo->wfd_tdls_enable) {
+			v16 = pwfd_info->wfd_device_type | WFD_DEVINFO_WSD | WFD_DEVINFO_PC_TDLS | WFD_DEVINFO_HDCP_SUPPORT;
+			RTW_PUT_BE16(wfdie + wfdielen, v16);
+		} else {
+			v16 =  pwfd_info->wfd_device_type | WFD_DEVINFO_WSD | WFD_DEVINFO_HDCP_SUPPORT;
+			RTW_PUT_BE16(wfdie + wfdielen, v16);
+		}
 	}
 
 	wfdielen += 2;
@@ -2467,7 +2470,7 @@ u32 process_p2p_devdisc_req(struct wifidirect_info *pwdinfo, u8 *pframe, uint le
 
 							/* _exit_critical_bh(&pstapriv->asoc_list_lock, &irqL); */
 							/* issue GO Discoverability Request */
-							issue_group_disc_req(pwdinfo, psta->hwaddr);
+							issue_group_disc_req(pwdinfo, psta->cmn.mac_addr);
 							/* _enter_critical_bh(&pstapriv->asoc_list_lock, &irqL); */
 
 							status = P2P_STATUS_SUCCESS;
@@ -3289,10 +3292,136 @@ void p2p_concurrent_handler(_adapter	*padapter)
 #endif
 
 #ifdef CONFIG_IOCTL_CFG80211
+static u8 _stay_in_cur_chan(_adapter *padapter)
+{
+	int i;
+	_adapter *iface;
+	struct mlme_priv *pmlmepriv;
+	struct dvobj_priv *dvobj = adapter_to_dvobj(padapter);
+	u8 rst = _FALSE;
+
+	for (i = 0; i < dvobj->iface_nums; i++) {
+		iface = dvobj->padapters[i];
+		if (iface) {
+			pmlmepriv = &iface->mlmepriv;
+
+			if (check_fwstate(pmlmepriv, _FW_UNDER_LINKING | WIFI_UNDER_WPS) == _TRUE) {
+				RTW_ERR(ADPT_FMT"- _FW_UNDER_LINKING |WIFI_UNDER_WPS (mlme state:0x%x)\n",
+						ADPT_ARG(iface), get_fwstate(&iface->mlmepriv));
+				rst = _TRUE;
+				break;
+			}
+			#ifdef CONFIG_AP_MODE
+			if (MLME_IS_AP(iface) || MLME_IS_MESH(iface)) {
+				if (rtw_ap_sta_linking_state_check(iface) == _TRUE) {
+					RTW_ERR(ADPT_FMT"- SoftAP/Mesh -have sta under linking\n", ADPT_ARG(iface));
+					rst = _TRUE;
+					break;
+				}
+			}
+			#endif
+		}
+	}
+
+	return rst;
+}
+
 static int ro_ch_handler(_adapter *adapter, u8 *buf)
 {
-	/* TODO: move remain on channel logical here */
-	return H2C_SUCCESS;
+	int ret = H2C_SUCCESS;
+	struct p2p_roch_parm *roch_parm = (struct p2p_roch_parm *)buf;
+	struct rtw_wdev_priv *pwdev_priv = adapter_wdev_data(adapter);
+	struct cfg80211_wifidirect_info *pcfg80211_wdinfo = &adapter->cfg80211_wdinfo;
+	struct wifidirect_info *pwdinfo = &adapter->wdinfo;
+	struct mlme_ext_priv *pmlmeext = &adapter->mlmeextpriv;
+	u8 ready_on_channel = _FALSE;
+	u8 remain_ch;
+	unsigned int duration;
+
+	_enter_critical_mutex(&pwdev_priv->roch_mutex, NULL);
+
+	if (rtw_cfg80211_get_is_roch(adapter) != _TRUE)
+		goto exit;
+
+	remain_ch = (u8) ieee80211_frequency_to_channel(roch_parm->ch.center_freq);
+	duration = roch_parm->duration;
+
+	RTW_INFO(FUNC_ADPT_FMT" ch:%u duration:%d, cookie:0x%llx\n"
+		, FUNC_ADPT_ARG(adapter), remain_ch, roch_parm->duration, roch_parm->cookie);
+
+	if (roch_parm->wdev && roch_parm->cookie) {
+		if (pcfg80211_wdinfo->ro_ch_wdev != roch_parm->wdev) {
+			RTW_WARN(FUNC_ADPT_FMT" ongoing wdev:%p, wdev:%p\n"
+				, FUNC_ADPT_ARG(adapter), pcfg80211_wdinfo->ro_ch_wdev, roch_parm->wdev);
+			rtw_warn_on(1);
+		}
+
+		if (pcfg80211_wdinfo->remain_on_ch_cookie != roch_parm->cookie) {
+			RTW_WARN(FUNC_ADPT_FMT" ongoing cookie:0x%llx, cookie:0x%llx\n"
+				, FUNC_ADPT_ARG(adapter), pcfg80211_wdinfo->remain_on_ch_cookie, roch_parm->cookie);
+			rtw_warn_on(1);
+		}
+	}
+
+	if (_stay_in_cur_chan(adapter) == _TRUE) {
+		remain_ch = rtw_mi_get_union_chan(adapter);
+		RTW_INFO(FUNC_ADPT_FMT" stay in union ch:%d\n", FUNC_ADPT_ARG(adapter), remain_ch);
+	}
+
+	#ifdef CONFIG_CONCURRENT_MODE
+	if (rtw_mi_check_status(adapter, MI_LINKED) && (0 != rtw_mi_get_union_chan(adapter))) {
+		if ((remain_ch != rtw_mi_get_union_chan(adapter)) && !check_fwstate(&adapter->mlmepriv, _FW_LINKED)) {
+			if (
+				#ifdef RTW_ROCH_BACK_OP
+				ATOMIC_READ(&pwdev_priv->switch_ch_to) == 1 ||
+				#endif
+				(remain_ch != pmlmeext->cur_channel)) {
+				#ifdef CONFIG_AP_MODE
+				/*mac-id sleep or wake-up for AP mode*/
+				rtw_mi_buddy_ap_acdata_control(adapter, 1);
+				#endif/*CONFIG_AP_MODE*/
+				rtw_mi_buddy_issue_nulldata(adapter, NULL, 1, 3, 500);
+				#ifdef RTW_ROCH_BACK_OP
+				RTW_INFO("%s, set switch ch timer, duration=%d\n", __func__, duration - pwdinfo->ext_listen_interval);
+				ATOMIC_SET(&pwdev_priv->switch_ch_to, 0);
+				_set_timer(&pwdinfo->ap_p2p_switch_timer, duration - pwdinfo->ext_listen_interval);
+				#endif
+			}
+		}
+		ready_on_channel = _TRUE;
+	} else
+	#endif /* CONFIG_CONCURRENT_MODE */
+	{
+		if (remain_ch != rtw_get_oper_ch(adapter))
+			ready_on_channel = _TRUE;
+	}
+
+	if (ready_on_channel == _TRUE) {
+		#ifndef RTW_SINGLE_WIPHY
+		if (!check_fwstate(&adapter->mlmepriv, _FW_LINKED))
+		#endif
+		{
+			#ifdef CONFIG_CONCURRENT_MODE
+			if (rtw_get_oper_ch(adapter) != remain_ch)
+			#endif
+			{
+				/* if (!padapter->mlmepriv.LinkDetectInfo.bBusyTraffic) */
+				set_channel_bwmode(adapter, remain_ch, HAL_PRIME_CHNL_OFFSET_DONT_CARE, CHANNEL_WIDTH_20);
+			}
+		}
+	}
+
+	#ifdef CONFIG_BT_COEXIST
+	rtw_btcoex_ScanNotify(adapter, _TRUE);
+	#endif
+
+	RTW_INFO("%s, set ro ch timer, duration=%d\n", __func__, duration);
+	_set_timer(&pcfg80211_wdinfo->remain_on_ch_timer, duration);
+
+exit:
+	_exit_critical_mutex(&pwdev_priv->roch_mutex, NULL);
+
+	return ret;
 }
 
 static int cancel_ro_ch_handler(_adapter *padapter, u8 *buf)

@@ -1,6 +1,6 @@
 /******************************************************************************
  *
- * Copyright(c) 2007 - 2012 Realtek Corporation. All rights reserved.
+ * Copyright(c) 2007 - 2017 Realtek Corporation.
  *
  * This program is free software; you can redistribute it and/or modify it
  * under the terms of version 2 of the GNU General Public License as
@@ -11,12 +11,7 @@
  * FITNESS FOR A PARTICULAR PURPOSE. See the GNU General Public License for
  * more details.
  *
- * You should have received a copy of the GNU General Public License along with
- * this program; if not, write to the Free Software Foundation, Inc.,
- * 51 Franklin Street, Fifth Floor, Boston, MA 02110, USA
- *
- *
- ******************************************************************************/
+ *****************************************************************************/
 #ifndef _WIFI_H_
 #define _WIFI_H_
 
@@ -472,6 +467,7 @@ __inline static unsigned char *get_ta(unsigned char *pframe)
 	return ta;
 }
 
+/* can't apply to mesh mode */
 __inline static unsigned char *get_da(unsigned char *pframe)
 {
 	unsigned char	*da;
@@ -495,7 +491,7 @@ __inline static unsigned char *get_da(unsigned char *pframe)
 	return da;
 }
 
-
+/* can't apply to mesh mode */
 __inline static unsigned char *get_sa(unsigned char *pframe)
 {
 	unsigned char	*sa;
@@ -519,6 +515,7 @@ __inline static unsigned char *get_sa(unsigned char *pframe)
 	return sa;
 }
 
+/* can't apply to mesh mode */
 __inline static unsigned char *get_hdr_bssid(unsigned char *pframe)
 {
 	unsigned char	*sa = NULL;
@@ -550,6 +547,22 @@ __inline static int IsFrameTypeCtrl(unsigned char *pframe)
 	else
 		return _FALSE;
 }
+static inline int IsFrameTypeMgnt(unsigned char *pframe)
+{
+	if (GetFrameType(pframe) == WIFI_MGT_TYPE)
+		return _TRUE;
+	else
+		return _FALSE;
+}
+static inline int IsFrameTypeData(unsigned char *pframe)
+{
+	if (GetFrameType(pframe) == WIFI_DATA_TYPE)
+		return _TRUE;
+	else
+		return _FALSE;
+}
+
+
 /*-----------------------------------------------------------------------------
 			Below is for the security related definition
 ------------------------------------------------------------------------------*/
@@ -817,6 +830,7 @@ struct rtw_ieee80211_ht_cap {
  * This structure refers to "HT information element" as
  * described in 802.11n draft section 7.3.2.53
  */
+#ifndef CONFIG_IEEE80211_HT_ADDT_INFO
 struct ieee80211_ht_addt_info {
 	unsigned char	control_chan;
 	unsigned char		ht_param;
@@ -824,7 +838,7 @@ struct ieee80211_ht_addt_info {
 	unsigned short	stbc_param;
 	unsigned char		basic_set[16];
 } __attribute__((packed));
-
+#endif
 
 struct HT_caps_element {
 	union {
@@ -943,6 +957,13 @@ typedef enum _HT_CAP_AMPDU_FACTOR {
 	MAX_AMPDU_FACTOR_64K	= 3,
 } HT_CAP_AMPDU_FACTOR;
 
+typedef enum _VHT_CAP_AMPDU_FACTOR {
+	MAX_AMPDU_FACTOR_128K = 4,
+	MAX_AMPDU_FACTOR_256K = 5,
+	MAX_AMPDU_FACTOR_512K = 6,
+	MAX_AMPDU_FACTOR_1M = 7,
+} VHT_CAP_AMPDU_FACTOR;
+
 
 typedef enum _HT_CAP_AMPDU_DENSITY {
 	AMPDU_DENSITY_VALUE_0 = 0 , /* For no restriction */
@@ -997,6 +1018,7 @@ typedef enum _HT_CAP_AMPDU_DENSITY {
 #define IEEE80211_HT_IE_NON_GF_STA_PRSNT	0x0004
 #define IEEE80211_HT_IE_NON_HT_STA_PRSNT	0x0010
 
+#ifdef CONFIG_VHT_EXTRAS
 /* 802.11ac VHT Capabilities */
 #define IEEE80211_VHT_CAP_MAX_MPDU_LENGTH_3895                  0x00000000
 #define IEEE80211_VHT_CAP_MAX_MPDU_LENGTH_7991                  0x00000001
@@ -1032,6 +1054,7 @@ typedef enum _HT_CAP_AMPDU_DENSITY {
 #define IEEE80211_VHT_CAP_VHT_LINK_ADAPTATION_VHT_MRQ_MFB       0x0c000000
 #define IEEE80211_VHT_CAP_RX_ANTENNA_PATTERN                    0x10000000
 #define IEEE80211_VHT_CAP_TX_ANTENNA_PATTERN                    0x20000000
+#endif //CONFIG_VHT_EXTRAS
 
 /* block-ack parameters */
 #define IEEE80211_ADDBA_PARAM_POLICY_MASK 0x0002

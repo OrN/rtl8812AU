@@ -60,6 +60,7 @@ CONFIG_LOAD_PHY_PARA_FROM_FILE = y
 CONFIG_TXPWR_BY_RATE_EN = y
 CONFIG_TXPWR_LIMIT_EN = n
 CONFIG_CALIBRATE_TX_POWER_TO_MAX = y
+CONFIG_RTW_CHPLAN = 0xFF
 CONFIG_RTW_ADAPTIVITY_EN = disable
 CONFIG_RTW_ADAPTIVITY_MODE = normal
 CONFIG_SIGNAL_SCALE_MAPPING = n
@@ -72,6 +73,11 @@ CONFIG_MCC_MODE = n
 CONFIG_APPEND_VENDOR_IE_ENABLE = n
 CONFIG_RTW_NAPI = y
 CONFIG_RTW_GRO = y
+CONFIG_RTW_IPCAM_APPLICATION = n
+CONFIG_RTW_REPEATER_SON = n
+CONFIG_VHT_EXTRAS = y
+CONFIG_LED_CONTROL = y
+CONFIG_LED_ENABLE = y
 ########################## Debug ###########################
 CONFIG_RTW_DEBUG = n
 # default log level is _DRV_INFO_ = 4,
@@ -79,6 +85,7 @@ CONFIG_RTW_DEBUG = n
 CONFIG_RTW_LOG_LEVEL = 4
 ######################## Wake On Lan ##########################
 CONFIG_WOWLAN = n
+CONFIG_WAKEUP_TYPE = 0x7 #bit2: deauth, bit1: unicast, bit0: magic pkt.
 CONFIG_GPIO_WAKEUP = n
 CONFIG_DEFAULT_PATTERNS_EN = n
 CONFIG_WAKEUP_GPIO_IDX = default
@@ -144,6 +151,7 @@ CONFIG_PLATFORM_RTK129X = n
 CONFIG_PLATFORM_NOVATEK_NT72668 = n
 CONFIG_PLATFORM_HISILICON = n
 CONFIG_PLATFORM_NV_TK1 = n
+CONFIG_PLATFORM_RTL8197D = n
 ###############################################################
 
 CONFIG_DRVEXT_MODULE = n
@@ -202,6 +210,7 @@ _HAL_INTFS_FILES :=	hal/hal_intf.o \
 			hal/hal_com_phycfg.o \
 			hal/hal_phy.o \
 			hal/hal_dm.o \
+			hal/hal_dm_acs.o \
 			hal/hal_btcoex_wifionly.o \
 			hal/hal_btcoex.o \
 			hal/hal_mp.o \
@@ -837,6 +846,10 @@ else ifeq ($(CONFIG_TXPWR_LIMIT_EN), auto)
 EXTRA_CFLAGS += -DCONFIG_TXPWR_LIMIT_EN=2
 endif
 
+ifneq ($(CONFIG_RTW_CHPLAN), 0xFF)
+EXTRA_CFLAGS += -DCONFIG_RTW_CHPLAN=$(CONFIG_RTW_CHPLAN)
+endif
+
 ifeq ($(CONFIG_CALIBRATE_TX_POWER_BY_REGULATORY), y)
 EXTRA_CFLAGS += -DCONFIG_CALIBRATE_TX_POWER_BY_REGULATORY
 endif
@@ -866,7 +879,7 @@ EXTRA_CFLAGS += -DCONFIG_IEEE80211W
 endif
 
 ifeq ($(CONFIG_WOWLAN), y)
-EXTRA_CFLAGS += -DCONFIG_WOWLAN
+EXTRA_CFLAGS += -DCONFIG_WOWLAN -DRTW_WAKEUP_EVENT=$(CONFIG_WAKEUP_TYPE)
 ifeq ($(CONFIG_SDIO_HCI), y)
 EXTRA_CFLAGS += -DCONFIG_RTW_SDIO_PM_KEEP_POWER
 endif
@@ -937,6 +950,28 @@ endif
 
 ifeq ($(CONFIG_RTW_GRO), y)
 EXTRA_CFLAGS += -DCONFIG_RTW_GRO
+endif
+
+ifeq ($(CONFIG_RTW_REPEATER_SON), y)
+EXTRA_CFLAGS += -DCONFIG_RTW_REPEATER_SON
+endif
+
+ifeq ($(CONFIG_RTW_IPCAM_APPLICATION), y)
+EXTRA_CFLAGS += -DCONFIG_RTW_IPCAM_APPLICATION
+ifeq ($(CONFIG_WIFI_MONITOR), n)
+EXTRA_CFLAGS += -DCONFIG_WIFI_MONITOR
+endif
+endif
+
+ifeq ($(CONFIG_VHT_EXTRAS), y)
+EXTRA_CFLAGS += -DCONFIG_VHT_EXTRAS
+endif
+
+ifeq ($(CONFIG_LED_CONTROL), y)
+EXTRA_CFLAGS += -DCONFIG_LED_CONTROL
+ifeq ($(CONFIG_LED_ENABLE), y)
+EXTRA_CFLAGS += -DCONFIG_LED_ENABLE
+endif
 endif
 
 ifeq ($(CONFIG_MP_VHT_HW_TX_MODE), y)
@@ -1383,17 +1418,6 @@ KVER:= 2.6.31.6
 KSRC:= ../code/linux-2.6.31.6-2020/
 endif
 
-#Add setting for MN10300
-ifeq ($(CONFIG_PLATFORM_MN10300), y)
-EXTRA_CFLAGS += -DCONFIG_LITTLE_ENDIAN -DCONFIG_PLATFORM_MN10300
-ARCH := mn10300
-CROSS_COMPILE := mn10300-linux-
-KVER := 2.6.32.2
-KSRC := /home/winuser/work/Plat_sLD2T_V3010/usr/src/linux-2.6.32.2
-INSTALL_PREFIX :=
-endif
-
-
 ifeq ($(CONFIG_PLATFORM_ARM_SUNxI), y)
 EXTRA_CFLAGS += -DCONFIG_LITTLE_ENDIAN
 EXTRA_CFLAGS += -DCONFIG_PLATFORM_ARM_SUNxI
@@ -1662,6 +1686,8 @@ EXTRA_CFLAGS += -DCONFIG_CONCURRENT_MODE
 EXTRA_CFLAGS += -DCONFIG_IOCTL_CFG80211 -DRTW_USE_CFG80211_STA_EVENT
 #EXTRA_CFLAGS += -DCONFIG_P2P_IPS -DCONFIG_QOS_OPTIMIZATION
 EXTRA_CFLAGS += -DCONFIG_QOS_OPTIMIZATION
+# Enable this for Android 5.0
+EXTRA_CFLAGS += -DCONFIG_RADIO_WORK
 ifeq ($(CONFIG_RTL8821C)$(CONFIG_SDIO_HCI),yy)
 EXTRA_CFLAGS += -DCONFIG_WAKEUP_GPIO_INPUT_MODE
 EXTRA_CFLAGS += -DCONFIG_BT_WAKE_HST_OPEN_DRAIN
@@ -1712,6 +1738,14 @@ KSRC := /home/android_sdk/Telechips/v13.05_r1-tcc-android-4.2.2_tcc893x-evm_buil
 MODULE_NAME := wlan
 endif 
 
+ifeq ($(CONFIG_PLATFORM_RTL8197D), y)
+EXTRA_CFLAGS += -DCONFIG_BIG_ENDIAN -DCONFIG_PLATFORM_RTL8197D
+export DIR_LINUX=$(shell pwd)/../SDK/rlxlinux-sdk321-v50/linux-2.6.30
+ARCH ?= rlx
+CROSS_COMPILE:= $(DIR_LINUX)/../toolchain/rsdk-1.5.5-5281-EB-2.6.30-0.9.30.3-110714/bin/rsdk-linux-
+KSRC := $(DIR_LINUX)
+endif
+
 ifeq ($(CONFIG_MULTIDRV), y)
 
 ifeq ($(CONFIG_SDIO_HCI), y)
@@ -1755,6 +1789,7 @@ rtk_core :=	core/rtw_cmd.o \
 		core/rtw_ap.o \
 		core/rtw_xmit.o	\
 		core/rtw_p2p.o \
+		core/rtw_rson.o \
 		core/rtw_tdls.o \
 		core/rtw_br_ext.o \
 		core/rtw_iol.o \
@@ -1856,7 +1891,7 @@ clean:
 	cd hal ; rm -fr */*/*/*.mod.c */*/*/*.mod */*/*/*.o */*/*/.*.cmd */*/*/*.ko
 	cd hal ; rm -fr */*/*.mod.c */*/*.mod */*/*.o */*/.*.cmd */*/*.ko
 	cd hal ; rm -fr */*.mod.c */*.mod */*.o */.*.cmd */*.ko
-	cd hal ; rm -fr *.mod.c *.mod *.o .*.cmd *.ko .cache.mk
+	cd hal ; rm -fr *.mod.c *.mod *.o .*.cmd *.ko
 	cd core/efuse ; rm -fr *.mod.c *.mod *.o .*.cmd *.ko
 	cd core ; rm -fr *.mod.c *.mod *.o .*.cmd *.ko
 	cd os_dep/linux ; rm -fr *.mod.c *.mod *.o .*.cmd *.ko
@@ -1865,5 +1900,6 @@ clean:
 	rm -fr Module.symvers ; rm -fr Module.markers ; rm -fr modules.order
 	rm -fr *.mod.c *.mod *.o .*.cmd *.ko *~
 	rm -fr .tmp_versions
+	rm -fr .cache.mk
 endif
 

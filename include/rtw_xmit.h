@@ -1,6 +1,6 @@
 /******************************************************************************
  *
- * Copyright(c) 2007 - 2011 Realtek Corporation. All rights reserved.
+ * Copyright(c) 2007 - 2017 Realtek Corporation.
  *
  * This program is free software; you can redistribute it and/or modify it
  * under the terms of version 2 of the GNU General Public License as
@@ -11,12 +11,7 @@
  * FITNESS FOR A PARTICULAR PURPOSE. See the GNU General Public License for
  * more details.
  *
- * You should have received a copy of the GNU General Public License along with
- * this program; if not, write to the Free Software Foundation, Inc.,
- * 51 Franklin Street, Fifth Floor, Boston, MA 02110, USA
- *
- *
- ******************************************************************************/
+ *****************************************************************************/
 #ifndef _RTW_XMIT_H_
 #define _RTW_XMIT_H_
 
@@ -324,6 +319,21 @@ struct rtw_tx_ring {
 	u16		hw_rp_cache;
 #endif
 };
+
+#ifdef DBG_TXBD_DESC_DUMP
+
+#define TX_BAK_FRMAE_CNT	10
+#define TX_BAK_DESC_LEN	48	/* byte */
+#define TX_BAK_DATA_LEN		30	/* byte */
+
+struct rtw_tx_desc_backup {
+	int tx_bak_rp;
+	int tx_bak_wp;
+	u8 tx_bak_desc[TX_BAK_DESC_LEN];
+	u8 tx_bak_data_hdr[TX_BAK_DATA_LEN];
+	u8 tx_desc_size;
+};
+#endif
 #endif
 
 struct	hw_xmit	{
@@ -438,6 +448,10 @@ struct pkt_attrib {
 	u8   mbssid;
 	u8	ldpc;
 	u8	stbc;
+#ifdef CONFIG_WMMPS_STA
+	u8	trigger_frame;
+#endif /* CONFIG_WMMPS_STA */
+	
 	struct sta_info *psta;
 #ifdef CONFIG_TCP_CSUM_OFFLOAD_TX
 	u8	hw_tcp_csum;
@@ -505,7 +519,7 @@ enum {
 bool rtw_xmit_ac_blocked(_adapter *adapter);
 
 struct  submit_ctx {
-	u32 submit_time; /* */
+	systime submit_time; /* */
 	u32 timeout_ms; /* <0: not synchronous, 0: wait forever, >0: up to ms waiting */
 	int status; /* status for operation */
 #ifdef PLATFORM_LINUX
@@ -527,6 +541,7 @@ enum {
 	RTW_SCTX_DONE_DRV_STOP,
 	RTW_SCTX_DONE_DEV_REMOVE,
 	RTW_SCTX_DONE_CMD_ERROR,
+	RTW_SCTX_DONE_CMD_DROP,
 	RTX_SCTX_CSTR_WAIT_RPT2,
 };
 
@@ -851,6 +866,9 @@ struct	xmit_priv	{
 	u32 amsdu_debug_coalesce_two;
 
 #endif
+#ifdef DBG_TXBD_DESC_DUMP
+	BOOLEAN	 dump_txbd_desc;
+#endif
 	_lock lock_sctx;
 
 };
@@ -884,6 +902,11 @@ void rtw_count_tx_stats(_adapter *padapter, struct xmit_frame *pxmitframe, int s
 extern void rtw_update_protection(_adapter *padapter, u8 *ie, uint ie_len);
 static s32 update_attrib_sec_info(_adapter *padapter, struct pkt_attrib *pattrib, struct sta_info *psta);
 static void update_attrib_phy_info(_adapter *padapter, struct pkt_attrib *pattrib, struct sta_info *psta);
+
+#ifdef CONFIG_WMMPS_STA
+static void update_attrib_trigger_frame_info(_adapter *padapter, struct pkt_attrib *pattrib);
+#endif /* CONFIG_WMMPS_STA */
+
 extern s32 rtw_make_wlanhdr(_adapter *padapter, u8 *hdr, struct pkt_attrib *pattrib);
 extern s32 rtw_put_snap(u8 *data, u16 h_proto);
 
@@ -973,6 +996,12 @@ extern s32 rtw_xmitframe_coalesce_amsdu(_adapter *padapter, struct xmit_frame *p
 extern s32 check_amsdu(struct xmit_frame *pxmitframe);
 extern s32 check_amsdu_tx_support(_adapter *padapter);
 extern struct xmit_frame *rtw_get_xframe(struct xmit_priv *pxmitpriv, int *num_frame);
+#endif
+
+#ifdef DBG_TXBD_DESC_DUMP
+void rtw_tx_desc_backup(_adapter *padapter, struct xmit_frame *pxmitframe, u8 desc_size, u8 hwq);
+void rtw_tx_desc_backup_reset(void);
+u8 rtw_get_tx_desc_backup(_adapter *padapter, u8 hwq, struct rtw_tx_desc_backup **pbak);
 #endif
 
 static void do_queue_select(_adapter *padapter, struct pkt_attrib *pattrib);

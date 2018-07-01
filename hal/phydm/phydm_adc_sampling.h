@@ -1,7 +1,22 @@
+/******************************************************************************
+ *
+ * Copyright(c) 2007 - 2017 Realtek Corporation.
+ *
+ * This program is free software; you can redistribute it and/or modify it
+ * under the terms of version 2 of the GNU General Public License as
+ * published by the Free Software Foundation.
+ *
+ * This program is distributed in the hope that it will be useful, but WITHOUT
+ * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
+ * FITNESS FOR A PARTICULAR PURPOSE. See the GNU General Public License for
+ * more details.
+ *
+ *****************************************************************************/
+
 #ifndef __INC_ADCSMP_H
 #define __INC_ADCSMP_H
 
-#define DYNAMIC_LA_MODE	"1.0"  /*2016.07.15  Dino */
+#define DYNAMIC_LA_MODE	"2.0"  /*2017.02.06  Dino */
 
 #if (PHYDM_LA_MODE_SUPPORT == 1)
 

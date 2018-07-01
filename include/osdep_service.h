@@ -1,6 +1,6 @@
 /******************************************************************************
  *
- * Copyright(c) 2007 - 2013 Realtek Corporation. All rights reserved.
+ * Copyright(c) 2007 - 2017 Realtek Corporation.
  *
  * This program is free software; you can redistribute it and/or modify it
  * under the terms of version 2 of the GNU General Public License as
@@ -11,12 +11,7 @@
  * FITNESS FOR A PARTICULAR PURPOSE. See the GNU General Public License for
  * more details.
  *
- * You should have received a copy of the GNU General Public License along with
- * this program; if not, write to the Free Software Foundation, Inc.,
- * 51 Franklin Street, Fifth Floor, Boston, MA 02110, USA
- *
- *
- ******************************************************************************/
+ *****************************************************************************/
 #ifndef __OSDEP_SERVICE_H_
 #define __OSDEP_SERVICE_H_
 
@@ -44,6 +39,11 @@
 #endif
 
 #ifdef PLATFORM_LINUX
+	#include <linux/version.h>
+#if (LINUX_VERSION_CODE >= KERNEL_VERSION(4, 11, 0))
+	#include <linux/sched/signal.h>
+	#include <linux/sched/types.h>
+#endif
 	#include <osdep_service_linux.h>
 #endif
 
@@ -283,6 +283,10 @@ void _rtw_usb_buffer_free(struct usb_device *dev, size_t size, void *addr, dma_a
 extern void	*rtw_malloc2d(int h, int w, size_t size);
 extern void	rtw_mfree2d(void *pbuf, int h, int w, int size);
 
+void rtw_os_pkt_free(_pkt *pkt);
+void *rtw_os_pkt_data(_pkt *pkt);
+u32 rtw_os_pkt_len(_pkt *pkt);
+
 extern void	_rtw_memcpy(void *dec, const void *sour, u32 sz);
 extern void _rtw_memmove(void *dst, const void *src, u32 sz);
 extern int	_rtw_memcmp(const void *dst, const void *src, u32 sz);
@@ -316,11 +320,25 @@ extern void _rtw_deinit_queue(_queue *pqueue);
 extern u32	_rtw_queue_empty(_queue	*pqueue);
 extern u32	rtw_end_of_queue_search(_list *queue, _list *pelement);
 
-extern u32	rtw_get_current_time(void);
-extern u32	rtw_systime_to_ms(u32 systime);
-extern u32	rtw_ms_to_systime(u32 ms);
-extern s32	rtw_get_passing_time_ms(u32 start);
-extern s32	rtw_get_time_interval_ms(u32 start, u32 end);
+extern systime _rtw_get_current_time(void);
+extern u32	_rtw_systime_to_ms(systime stime);
+extern systime _rtw_ms_to_systime(u32 ms);
+extern s32	_rtw_get_passing_time_ms(systime start);
+extern s32	_rtw_get_time_interval_ms(systime start, systime end);
+
+#ifdef DBG_SYSTIME
+#define rtw_get_current_time() ({systime __stime = _rtw_get_current_time(); __stime;})
+#define rtw_systime_to_ms(stime) ({u32 __ms = _rtw_systime_to_ms(stime); typecheck(systime, stime); __ms;})
+#define rtw_ms_to_systime(ms) ({systime __stime = _rtw_ms_to_systime(ms); __stime;})
+#define rtw_get_passing_time_ms(start) ({u32 __ms = _rtw_get_passing_time_ms(start); typecheck(systime, start); __ms;})
+#define rtw_get_time_interval_ms(start, end) ({u32 __ms = _rtw_get_time_interval_ms(start, end); typecheck(systime, start); typecheck(systime, end); __ms;})
+#else
+#define rtw_get_current_time() _rtw_get_current_time()
+#define rtw_systime_to_ms(stime) _rtw_systime_to_ms(stime)
+#define rtw_ms_to_systime(ms) _rtw_ms_to_systime(ms)
+#define rtw_get_passing_time_ms(start) _rtw_get_passing_time_ms(start)
+#define rtw_get_time_interval_ms(start, end) _rtw_get_time_interval_ms(start, end)
+#endif
 
 extern void	rtw_sleep_schedulable(int ms);
 

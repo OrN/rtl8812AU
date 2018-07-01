@@ -1,6 +1,6 @@
 /******************************************************************************
  *
- * Copyright(c) 2007 - 2011 Realtek Corporation. All rights reserved.
+ * Copyright(c) 2007 - 2017 Realtek Corporation.
  *
  * This program is free software; you can redistribute it and/or modify it
  * under the terms of version 2 of the GNU General Public License as
@@ -11,12 +11,7 @@
  * FITNESS FOR A PARTICULAR PURPOSE. See the GNU General Public License for
  * more details.
  *
- * You should have received a copy of the GNU General Public License along with
- * this program; if not, write to the Free Software Foundation, Inc.,
- * 51 Franklin Street, Fifth Floor, Boston, MA 02110, USA
- *
- *
- ******************************************************************************/
+ *****************************************************************************/
 #ifndef __RTL8723B_HAL_H__
 #define __RTL8723B_HAL_H__
 
@@ -154,11 +149,13 @@ typedef struct _RT_8723B_FIRMWARE_HDR {
 #define NORMAL_PAGE_NUM_HPQ_8723B		0x0C
 #define NORMAL_PAGE_NUM_LPQ_8723B		0x02
 #define NORMAL_PAGE_NUM_NPQ_8723B		0x02
+#define NORMAL_PAGE_NUM_EPQ_8723B		0x04
 
 /* Note: For Normal Chip Setting, modify later */
 #define WMM_NORMAL_PAGE_NUM_HPQ_8723B		0x30
 #define WMM_NORMAL_PAGE_NUM_LPQ_8723B		0x20
 #define WMM_NORMAL_PAGE_NUM_NPQ_8723B		0x20
+#define WMM_NORMAL_PAGE_NUM_EPQ_8723B		0x00
 
 
 #include "HalVerDef.h"
@@ -233,7 +230,7 @@ VOID Hal_EfuseParseBoardType_8723B(PADAPTER Adapter,	u8	*PROMContent, BOOLEAN Au
 
 void rtl8723b_set_hal_ops(struct hal_ops *pHalFunc);
 void init_hal_spec_8723b(_adapter *adapter);
-void SetHwReg8723B(PADAPTER padapter, u8 variable, u8 *val);
+u8 SetHwReg8723B(PADAPTER padapter, u8 variable, u8 *val);
 void GetHwReg8723B(PADAPTER padapter, u8 variable, u8 *val);
 u8 SetHalDefVar8723B(PADAPTER padapter, HAL_DEF_VARIABLE variable, void *pval);
 u8 GetHalDefVar8723B(PADAPTER padapter, HAL_DEF_VARIABLE variable, void *pval);

@@ -1,6 +1,6 @@
 /******************************************************************************
  *
- * Copyright(c) 2007 - 2011 Realtek Corporation. All rights reserved.
+ * Copyright(c) 2007 - 2017 Realtek Corporation.
  *
  * This program is free software; you can redistribute it and/or modify it
  * under the terms of version 2 of the GNU General Public License as
@@ -11,12 +11,7 @@
  * FITNESS FOR A PARTICULAR PURPOSE. See the GNU General Public License for
  * more details.
  *
- * You should have received a copy of the GNU General Public License along with
- * this program; if not, write to the Free Software Foundation, Inc.,
- * 51 Franklin Street, Fifth Floor, Boston, MA 02110, USA
- *
- *
- ******************************************************************************/
+ *****************************************************************************/
 
 #ifndef	__PHYDMDYMICRXPATH_H__
 #define    __PHYDMDYMICRXPATH_H__
@@ -30,7 +25,16 @@
 #define CANCEL_DRP_TIMMER		1
 #define RELEASE_DRP_TIMMER		2
 
-#if (CONFIG_DYNAMIC_RX_PATH == 1)
+#if (RTL8822B_SUPPORT == 1)
+struct drp_rtl8822b_struct {
+	enum bb_path	path_judge;
+	u16	path_a_cck_fa;
+	u16	path_b_cck_fa;
+	
+};
+#endif
+
+#ifdef CONFIG_DYNAMIC_RX_PATH
 
 enum drp_state_e {
 	DRP_INIT_STATE				= 0,

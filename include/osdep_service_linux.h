@@ -1,6 +1,6 @@
 /******************************************************************************
  *
- * Copyright(c) 2007 - 2013 Realtek Corporation. All rights reserved.
+ * Copyright(c) 2007 - 2017 Realtek Corporation.
  *
  * This program is free software; you can redistribute it and/or modify it
  * under the terms of version 2 of the GNU General Public License as
@@ -11,12 +11,7 @@
  * FITNESS FOR A PARTICULAR PURPOSE. See the GNU General Public License for
  * more details.
  *
- * You should have received a copy of the GNU General Public License along with
- * this program; if not, write to the Free Software Foundation, Inc.,
- * 51 Franklin Street, Fifth Floor, Boston, MA 02110, USA
- *
- *
- ******************************************************************************/
+ *****************************************************************************/
 #ifndef __OSDEP_LINUX_SERVICE_H_
 #define __OSDEP_LINUX_SERVICE_H_
 
@@ -70,10 +65,6 @@
 	#include <linux/limits.h>
 #endif
 
-#if (LINUX_VERSION_CODE >= KERNEL_VERSION(4,11,0))
-#include <linux/sched/signal.h>
-#endif
-
 #ifdef RTK_DMP_PLATFORM
 	#if (LINUX_VERSION_CODE > KERNEL_VERSION(2, 6, 12))
 		#include <linux/pageremap.h>
@@ -90,6 +81,11 @@
 
 #if (LINUX_VERSION_CODE >= KERNEL_VERSION(2, 6, 24))
 	#include <linux/ieee80211.h>
+#endif
+
+#if (LINUX_VERSION_CODE >= KERNEL_VERSION(2, 6, 25) && \
+	 LINUX_VERSION_CODE < KERNEL_VERSION(2, 6, 29))
+	#define CONFIG_IEEE80211_HT_ADDT_INFO
 #endif
 
 #ifdef CONFIG_IOCTL_CFG80211
@@ -206,6 +202,8 @@ typedef void *timer_hdl_context;
 #if (LINUX_VERSION_CODE < KERNEL_VERSION(2, 6, 24))
 	#define DMA_BIT_MASK(n) (((n) == 64) ? ~0ULL : ((1ULL<<(n))-1))
 #endif
+
+typedef unsigned long systime;
 
 #if (LINUX_VERSION_CODE < KERNEL_VERSION(2, 6, 22))
 /* Porting from linux kernel, for compatible with old kernel. */
@@ -425,11 +423,23 @@ static inline void rtw_netif_stop_queue(struct net_device *pnetdev)
 	netif_stop_queue(pnetdev);
 #endif
 }
-static inline void rtw_netif_carrier_on(struct net_device *pnetdev)
+static inline void rtw_netif_device_attach(struct net_device *pnetdev)
 {
 	netif_device_attach(pnetdev);
+}
+static inline void rtw_netif_device_detach(struct net_device *pnetdev)
+{
+	netif_device_detach(pnetdev);
+}
+static inline void rtw_netif_carrier_on(struct net_device *pnetdev)
+{
 	netif_carrier_on(pnetdev);
 }
+static inline void rtw_netif_carrier_off(struct net_device *pnetdev)
+{
+	netif_carrier_off(pnetdev);
+}
+
 static inline int rtw_merge_string(char *dst, int dst_len, const char *src1, const char *src2)
 {
 	int	len = 0;

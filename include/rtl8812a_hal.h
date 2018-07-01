@@ -1,6 +1,6 @@
 /******************************************************************************
  *
- * Copyright(c) 2007 - 2011 Realtek Corporation. All rights reserved.
+ * Copyright(c) 2007 - 2017 Realtek Corporation.
  *
  * This program is free software; you can redistribute it and/or modify it
  * under the terms of version 2 of the GNU General Public License as
@@ -11,12 +11,7 @@
  * FITNESS FOR A PARTICULAR PURPOSE. See the GNU General Public License for
  * more details.
  *
- * You should have received a copy of the GNU General Public License along with
- * this program; if not, write to the Free Software Foundation, Inc.,
- * 51 Franklin Street, Fifth Floor, Boston, MA 02110, USA
- *
- *
- ******************************************************************************/
+ *****************************************************************************/
 #ifndef __RTL8812A_HAL_H__
 #define __RTL8812A_HAL_H__
 
@@ -219,10 +214,12 @@ typedef struct _RT_FIRMWARE_8812 {
 #define NORMAL_PAGE_NUM_LPQ_8821			0x08/* 0x10 */
 #define NORMAL_PAGE_NUM_HPQ_8821		0x08/* 0x10 */
 #define NORMAL_PAGE_NUM_NPQ_8821		0x00
+#define NORMAL_PAGE_NUM_EPQ_8821			0x04
 
 #define WMM_NORMAL_PAGE_NUM_HPQ_8821		0x30
 #define WMM_NORMAL_PAGE_NUM_LPQ_8821		0x20
 #define WMM_NORMAL_PAGE_NUM_NPQ_8821		0x20
+#define WMM_NORMAL_PAGE_NUM_EPQ_8821		0x00
 
 #define MCC_NORMAL_PAGE_NUM_HPQ_8821		0x10
 #define MCC_NORMAL_PAGE_NUM_LPQ_8821		0x10
@@ -331,7 +328,7 @@ void SetBeaconRelatedRegisters8812A(PADAPTER padapter);
 void ReadRFType8812A(PADAPTER padapter);
 void InitDefaultValue8821A(PADAPTER padapter);
 
-void SetHwReg8812A(PADAPTER padapter, u8 variable, u8 *pval);
+u8 SetHwReg8812A(PADAPTER padapter, u8 variable, u8 *pval);
 void GetHwReg8812A(PADAPTER padapter, u8 variable, u8 *pval);
 u8 SetHalDefVar8812A(PADAPTER padapter, HAL_DEF_VARIABLE variable, void *pval);
 u8 GetHalDefVar8812A(PADAPTER padapter, HAL_DEF_VARIABLE variable, void *pval);

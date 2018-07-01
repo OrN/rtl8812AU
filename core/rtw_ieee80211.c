@@ -1,6 +1,6 @@
 /******************************************************************************
  *
- * Copyright(c) 2007 - 2011 Realtek Corporation. All rights reserved.
+ * Copyright(c) 2007 - 2017 Realtek Corporation.
  *
  * This program is free software; you can redistribute it and/or modify it
  * under the terms of version 2 of the GNU General Public License as
@@ -11,12 +11,7 @@
  * FITNESS FOR A PARTICULAR PURPOSE. See the GNU General Public License for
  * more details.
  *
- * You should have received a copy of the GNU General Public License along with
- * this program; if not, write to the Free Software Foundation, Inc.,
- * 51 Franklin Street, Fifth Floor, Boston, MA 02110, USA
- *
- *
- ******************************************************************************/
+ *****************************************************************************/
 #define _IEEE80211_C
 
 #ifdef CONFIG_PLATFORM_INTEL_BYT
@@ -853,23 +848,26 @@ u8 rtw_is_wps_ie(u8 *ie_ptr, uint *wps_ielen)
 	return match;
 }
 
-u8 *rtw_get_wps_ie_from_scan_queue(u8 *in_ie, uint in_len, u8 *wps_ie, uint *wps_ielen, u8 frame_type)
+u8 *rtw_get_wps_ie_from_scan_queue(u8 *in_ie, uint in_len, u8 *wps_ie, uint *wps_ielen, enum bss_type frame_type)
 {
 	u8	*wps = NULL;
 
 	RTW_INFO("[%s] frame_type = %d\n", __FUNCTION__, frame_type);
 	switch (frame_type) {
-	case 1:
-	case 3: {
+	case BSS_TYPE_BCN:
+	case BSS_TYPE_PROB_RSP: {
 		/*	Beacon or Probe Response */
 		wps = rtw_get_wps_ie(in_ie + _PROBERSP_IE_OFFSET_, in_len - _PROBERSP_IE_OFFSET_, wps_ie, wps_ielen);
 		break;
 	}
-	case 2: {
+	case BSS_TYPE_PROB_REQ: {
 		/*	Probe Request */
 		wps = rtw_get_wps_ie(in_ie + _PROBEREQ_IE_OFFSET_ , in_len - _PROBEREQ_IE_OFFSET_ , wps_ie, wps_ielen);
 		break;
 	}
+	default:
+	case BSS_TYPE_UNDEF:
+		break;
 	}
 	return wps;
 }

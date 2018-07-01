@@ -1,6 +1,6 @@
 /******************************************************************************
  *
- * Copyright(c) 2007 - 2012 Realtek Corporation. All rights reserved.
+ * Copyright(c) 2007 - 2017 Realtek Corporation.
  *
  * This program is free software; you can redistribute it and/or modify it
  * under the terms of version 2 of the GNU General Public License as
@@ -11,12 +11,7 @@
  * FITNESS FOR A PARTICULAR PURPOSE. See the GNU General Public License for
  * more details.
  *
- * You should have received a copy of the GNU General Public License along with
- * this program; if not, write to the Free Software Foundation, Inc.,
- * 51 Franklin Street, Fifth Floor, Boston, MA 02110, USA
- *
- *
- ******************************************************************************/
+ *****************************************************************************/
 #define _RTW_CMD_C_
 
 #include <drv_types.h>
@@ -540,7 +535,7 @@ thread_return rtw_cmd_thread(thread_context context)
 	u8 ret;
 	struct cmd_obj *pcmd;
 	u8 *pcmdbuf, *prspbuf;
-	u32 cmd_start_time;
+	systime cmd_start_time;
 	u32 cmd_process_time;
 	u8(*cmd_hdl)(_adapter *padapter, u8 *pbuf);
 	void (*pcmd_callback)(_adapter *dev, struct cmd_obj *pcmd);
@@ -667,8 +662,7 @@ post_process:
 		_enter_critical_mutex(&(pcmd->padapter->cmdpriv.sctx_mutex), NULL);
 		if (pcmd->sctx) {
 			if (0)
-				RTW_PRINT(FUNC_ADPT_FMT" pcmd->sctx\n",
-					  FUNC_ADPT_ARG(pcmd->padapter));
+				RTW_PRINT(FUNC_ADPT_FMT" pcmd->sctx\n", FUNC_ADPT_ARG(pcmd->padapter));
 			if (pcmd->res == H2C_SUCCESS)
 				rtw_sctx_done(&pcmd->sctx);
 			else
@@ -723,6 +717,14 @@ post_process:
 			if (extra_parm->pbuf && extra_parm->size > 0)
 				rtw_mfree(extra_parm->pbuf, extra_parm->size);
 		}
+
+		_enter_critical_mutex(&(pcmd->padapter->cmdpriv.sctx_mutex), NULL);
+		if (pcmd->sctx) {
+			if (0)
+				RTW_PRINT(FUNC_ADPT_FMT" pcmd->sctx\n", FUNC_ADPT_ARG(pcmd->padapter));
+			rtw_sctx_done_err(&pcmd->sctx, RTW_SCTX_DONE_CMD_DROP);
+		}
+		_exit_critical_mutex(&(pcmd->padapter->cmdpriv.sctx_mutex), NULL);
 
 		rtw_free_cmd_obj(pcmd);
 	} while (1);
@@ -1395,12 +1397,9 @@ u8 rtw_joinbss_cmd(_adapter  *padapter, struct wlan_network *pnetwork)
 			set_fwstate(pmlmepriv, WIFI_STATION_STATE);
 			break;
 
-		case Ndis802_11APMode:
-		case Ndis802_11AutoUnknown:
-		case Ndis802_11InfrastructureMax:
-		case Ndis802_11Monitor:
+		default:
+			rtw_warn_on(1);
 			break;
-
 		}
 	}
 
@@ -1448,6 +1447,9 @@ u8 rtw_joinbss_cmd(_adapter  *padapter, struct wlan_network *pnetwork)
 	pqospriv->qos_option = 0;
 
 	if (pregistrypriv->wmm_enable) {
+#ifdef CONFIG_WMMPS_STA	
+		rtw_uapsd_use_default_setting(padapter);
+#endif /* CONFIG_WMMPS_STA */		
 		tmp_len = rtw_restruct_wmm_ie(padapter, &pnetwork->network.IEs[0], &psecnetwork->IEs[0], pnetwork->network.IELength, psecnetwork->IELength);
 
 		if (psecnetwork->IELength != tmp_len) {
@@ -1672,7 +1674,7 @@ u8 rtw_setstakey_cmd(_adapter *padapter, struct sta_info *sta, u8 key_type, bool
 		goto exit;
 	}
 
-	_rtw_memcpy(psetstakey_para->addr, sta->hwaddr, ETH_ALEN);
+	_rtw_memcpy(psetstakey_para->addr, sta->cmn.mac_addr, ETH_ALEN);
 
 	if (check_fwstate(pmlmepriv, WIFI_STATION_STATE))
 		psetstakey_para->algorithm = (unsigned char) psecuritypriv->dot11PrivacyAlgrthm;
@@ -1740,8 +1742,8 @@ u8 rtw_clearstakey_cmd(_adapter *padapter, struct sta_info *sta, u8 enqueue)
 	}
 
 	if (!enqueue) {
-		while ((cam_id = rtw_camid_search(padapter, sta->hwaddr, -1, -1)) >= 0) {
-			RTW_PRINT("clear key for addr:"MAC_FMT", camid:%d\n", MAC_ARG(sta->hwaddr), cam_id);
+		while ((cam_id = rtw_camid_search(padapter, sta->cmn.mac_addr, -1, -1)) >= 0) {
+			RTW_PRINT("clear key for addr:"MAC_FMT", camid:%d\n", MAC_ARG(sta->cmn.mac_addr), cam_id);
 			clear_cam_entry(padapter, cam_id);
 			rtw_camid_free(padapter, cam_id);
 		}
@@ -1771,7 +1773,7 @@ u8 rtw_clearstakey_cmd(_adapter *padapter, struct sta_info *sta, u8 enqueue)
 		ph2c->rsp = (u8 *) psetstakey_rsp;
 		ph2c->rspsz = sizeof(struct set_stakey_rsp);
 
-		_rtw_memcpy(psetstakey_para->addr, sta->hwaddr, ETH_ALEN);
+		_rtw_memcpy(psetstakey_para->addr, sta->cmn.mac_addr, ETH_ALEN);
 
 		psetstakey_para->algorithm = _NO_PRIVACY_;
 
@@ -2011,53 +2013,6 @@ exit:
 
 }
 
-u8 rtw_set_securitypriv_cmd(_adapter *padapter, u8 *sme)
-{
-	struct cmd_obj *cmdobj;
-	struct drvextra_cmd_parm *pdrvextra_cmd_parm;
-	struct cmd_priv *pcmdpriv = &padapter->cmdpriv;
-	struct submit_ctx sctx;
-	u8	res = _SUCCESS;
-
-
-	cmdobj = (struct cmd_obj *)rtw_zmalloc(sizeof(struct cmd_obj));
-	if (cmdobj == NULL) {
-		res = _FAIL;
-		goto exit;
-	}
-
-	pdrvextra_cmd_parm = (struct drvextra_cmd_parm *)rtw_zmalloc(sizeof(struct drvextra_cmd_parm));
-	if (pdrvextra_cmd_parm == NULL) {
-		rtw_mfree((unsigned char *)cmdobj, sizeof(struct cmd_obj));
-		res = _FAIL;
-		goto exit;
-	}
-
-	pdrvextra_cmd_parm->ec_id = SET_SECURITYPRIV;
-	pdrvextra_cmd_parm->type = 0;
-	pdrvextra_cmd_parm->size = 0;
-	pdrvextra_cmd_parm->pbuf = sme;
-
-	init_h2fwcmd_w_parm_no_rsp(cmdobj, pdrvextra_cmd_parm, GEN_CMD_CODE(_Set_Drv_Extra));
-	cmdobj->sctx = &sctx;
-	rtw_sctx_init(&sctx, 2000);
-
-	/* rtw_enqueue_cmd(pcmdpriv, ph2c);	 */
-	res = rtw_enqueue_cmd(pcmdpriv, cmdobj);
-
-	if (res == _SUCCESS) {
-		rtw_sctx_wait(&sctx, __func__);
-		_enter_critical_mutex(&pcmdpriv->sctx_mutex, NULL);
-		if (sctx.status == RTW_SCTX_SUBMITTED)
-			cmdobj->sctx = NULL;
-		_exit_critical_mutex(&pcmdpriv->sctx_mutex, NULL);
-	}
-
-exit:
-	return res;
-
-}
-
 u8 rtw_free_assoc_resources_cmd(_adapter *padapter)
 {
 	struct cmd_obj		*ph2c;
@@ -2137,12 +2092,12 @@ exit:
 
 }
 
-u8 rtw_set_ch_cmd(_adapter *padapter, u8 ch, u8 bw, u8 ch_offset, u8 enqueue)
+u8 rtw_set_chbw_cmd(_adapter *padapter, u8 ch, u8 bw, u8 ch_offset, u8 flags)
 {
 	struct cmd_obj *pcmdobj;
 	struct set_ch_parm *set_ch_parm;
 	struct cmd_priv *pcmdpriv = &padapter->cmdpriv;
-
+	struct submit_ctx sctx;
 	u8 res = _SUCCESS;
 
 
@@ -2161,7 +2116,13 @@ u8 rtw_set_ch_cmd(_adapter *padapter, u8 ch, u8 bw, u8 ch_offset, u8 enqueue)
 	set_ch_parm->bw = bw;
 	set_ch_parm->ch_offset = ch_offset;
 
-	if (enqueue) {
+	if (flags & RTW_CMDF_DIRECTLY) {
+		/* no need to enqueue, do the cmd hdl directly and free cmd parameter */
+		if (H2C_SUCCESS != rtw_set_chbw_hdl(padapter, (u8 *)set_ch_parm))
+			res = _FAIL;
+
+		rtw_mfree((u8 *)set_ch_parm, sizeof(*set_ch_parm));
+	} else {
 		/* need enqueue, prepare cmd_obj and enqueue */
 		pcmdobj = (struct cmd_obj *)rtw_zmalloc(sizeof(struct	cmd_obj));
 		if (pcmdobj == NULL) {
@@ -2171,13 +2132,21 @@ u8 rtw_set_ch_cmd(_adapter *padapter, u8 ch, u8 bw, u8 ch_offset, u8 enqueue)
 		}
 
 		init_h2fwcmd_w_parm_no_rsp(pcmdobj, set_ch_parm, GEN_CMD_CODE(_SetChannel));
-		res = rtw_enqueue_cmd(pcmdpriv, pcmdobj);
-	} else {
-		/* no need to enqueue, do the cmd hdl directly and free cmd parameter */
-		if (H2C_SUCCESS != set_ch_hdl(padapter, (u8 *)set_ch_parm))
-			res = _FAIL;
 
-		rtw_mfree((u8 *)set_ch_parm, sizeof(*set_ch_parm));
+		if (flags & RTW_CMDF_WAIT_ACK) {
+			pcmdobj->sctx = &sctx;
+			rtw_sctx_init(&sctx, 10 * 1000);
+		}
+
+		res = rtw_enqueue_cmd(pcmdpriv, pcmdobj);
+
+		if (res == _SUCCESS && (flags & RTW_CMDF_WAIT_ACK)) {
+			rtw_sctx_wait(&sctx, __func__);
+			_enter_critical_mutex(&pcmdpriv->sctx_mutex, NULL);
+			if (sctx.status == RTW_SCTX_SUBMITTED)
+				pcmdobj->sctx = NULL;
+			_exit_critical_mutex(&pcmdpriv->sctx_mutex, NULL);
+		}
 	}
 
 	/* do something based on res... */
@@ -2288,7 +2257,7 @@ inline u8 rtw_set_country_cmd(_adapter *adapter, int flags, const char *country_
 
 	RTW_PRINT("%s country_code:\"%c%c\" mapping to chplan:0x%02x\n", __func__, country_code[0], country_code[1], ent->chplan);
 
-	return _rtw_set_chplan_cmd(adapter, flags, RTW_CHPLAN_MAX, ent, swconfig);
+	return _rtw_set_chplan_cmd(adapter, flags, RTW_CHPLAN_UNSPECIFIED, ent, swconfig);
 }
 
 u8 rtw_led_blink_cmd(_adapter *padapter, PVOID pLed)
@@ -2714,7 +2683,7 @@ void rtw_iface_dynamic_chk_wk_hdl(_adapter *padapter)
 
 	#ifdef CONFIG_ACTIVE_KEEP_ALIVE_CHECK
 	#ifdef CONFIG_AP_MODE
-	if (check_fwstate(pmlmepriv, WIFI_AP_STATE) == _TRUE)
+	if (MLME_IS_AP(padapter) || MLME_IS_MESH(padapter))
 		expire_timeout_chk(padapter);
 	#endif
 	#endif /* CONFIG_ACTIVE_KEEP_ALIVE_CHECK */
@@ -2897,7 +2866,7 @@ exit:
 
 void rtw_dm_in_lps_hdl(_adapter *padapter)
 {
-	rtw_hal_set_hwreg(padapter, HW_VAR_DM_IN_LPS, NULL);
+	rtw_hal_set_hwreg(padapter, HW_VAR_DM_IN_LPS_LCLK, NULL);
 }
 
 u8 rtw_dm_in_lps_wk_cmd(_adapter *padapter)
@@ -3168,13 +3137,6 @@ void reset_securitypriv_hdl(_adapter *padapter)
 	rtw_reset_securitypriv(padapter);
 }
 
-void set_securitypriv_hdl(_adapter *padapter, u8 *buf)
-{
-#ifdef CONFIG_IOCTL_CFG80211
-	rtw_cfg80211_set_securitypriv(padapter, buf);
-#endif
-}
-
 void free_assoc_resources_hdl(_adapter *padapter)
 {
 	rtw_free_assoc_resources(padapter, 1);
@@ -3317,6 +3279,79 @@ inline u8 p2p_cancel_roch_cmd(_adapter *adapter, u64 cookie, struct wireless_dev
 {
 	return _p2p_roch_cmd(adapter, cookie, wdev, NULL, 0, 0, flags);
 }
+
+inline u8 rtw_mgnt_tx_cmd(_adapter *adapter, u8 tx_ch, u8 no_cck, const u8 *buf, size_t len, int wait_ack, u8 flags)
+{
+	struct cmd_obj *cmdobj;
+	struct drvextra_cmd_parm *parm;
+	struct mgnt_tx_parm *mgnt_parm;
+	struct cmd_priv *pcmdpriv = &adapter->cmdpriv;
+	struct submit_ctx sctx;
+	u8	res = _SUCCESS;
+
+	mgnt_parm = (struct mgnt_tx_parm *)rtw_zmalloc(sizeof(struct mgnt_tx_parm));
+	if (mgnt_parm == NULL) {
+		res = _FAIL;
+			goto exit;
+	}
+
+	mgnt_parm->tx_ch = tx_ch;
+	mgnt_parm->no_cck = no_cck;
+	mgnt_parm->buf = buf;
+	mgnt_parm->len = len;
+	mgnt_parm->wait_ack = wait_ack;
+
+	if (flags & RTW_CMDF_DIRECTLY) {
+		/* no need to enqueue, do the cmd hdl directly and free cmd parameter */
+		if (H2C_SUCCESS != rtw_mgnt_tx_handler(adapter, (u8 *)mgnt_parm))
+			res = _FAIL;
+		rtw_mfree((u8 *)mgnt_parm, sizeof(*mgnt_parm));
+	} else {
+		/* need enqueue, prepare cmd_obj and enqueue */
+		parm = (struct drvextra_cmd_parm *)rtw_zmalloc(sizeof(struct drvextra_cmd_parm));
+		if (parm == NULL) {
+			rtw_mfree((u8 *)mgnt_parm, sizeof(*mgnt_parm));
+			res = _FAIL;
+			goto exit;
+		}
+
+		parm->ec_id = MGNT_TX_WK_CID;
+		parm->type = 0;
+		parm->size = sizeof(*mgnt_parm);
+		parm->pbuf = (u8 *)mgnt_parm;
+
+		cmdobj = (struct cmd_obj *)rtw_zmalloc(sizeof(*cmdobj));
+		if (cmdobj == NULL) {
+			res = _FAIL;
+			rtw_mfree((u8 *)mgnt_parm, sizeof(*mgnt_parm));
+			rtw_mfree((u8 *)parm, sizeof(*parm));
+			goto exit;
+		}
+
+		init_h2fwcmd_w_parm_no_rsp(cmdobj, parm, GEN_CMD_CODE(_Set_Drv_Extra));
+
+		if (flags & RTW_CMDF_WAIT_ACK) {
+			cmdobj->sctx = &sctx;
+			rtw_sctx_init(&sctx, 10 * 1000);
+		}
+
+		res = rtw_enqueue_cmd(pcmdpriv, cmdobj);
+
+		if (res == _SUCCESS && (flags & RTW_CMDF_WAIT_ACK)) {
+			rtw_sctx_wait(&sctx, __func__);
+			_enter_critical_mutex(&pcmdpriv->sctx_mutex, NULL);
+			if (sctx.status == RTW_SCTX_SUBMITTED)
+				cmdobj->sctx = NULL;
+			_exit_critical_mutex(&pcmdpriv->sctx_mutex, NULL);
+			if (sctx.status != RTW_SCTX_DONE_SUCCESS)
+				res = _FAIL;
+		}
+	}
+
+exit:
+	return res;
+}
+
 #endif /* CONFIG_IOCTL_CFG80211 */
 #endif /* CONFIG_P2P */
 
@@ -3367,7 +3402,7 @@ static void rtw_chk_hi_queue_hdl(_adapter *padapter)
 {
 	struct sta_info *psta_bmc;
 	struct sta_priv *pstapriv = &padapter->stapriv;
-	u32 start = rtw_get_current_time();
+	systime start = rtw_get_current_time();
 	u8 empty = _FALSE;
 
 	psta_bmc = rtw_get_bcmc_stainfo(padapter);
@@ -3478,7 +3513,7 @@ u8 rtw_dfs_master_hdl(_adapter *adapter)
 		for (i = 0; i < dvobj->iface_nums; i++) {
 			if (!dvobj->padapters[i])
 				continue;
-			if (check_fwstate(&dvobj->padapters[i]->mlmepriv, WIFI_AP_STATE)
+			if (check_fwstate(&dvobj->padapters[i]->mlmepriv, WIFI_AP_STATE | WIFI_MESH_STATE)
 				&& check_fwstate(&dvobj->padapters[i]->mlmepriv, WIFI_ASOC_STATE))
 				break;
 		}
@@ -3663,12 +3698,27 @@ void rtw_dfs_master_status_apply(_adapter *adapter, u8 self_action)
 	case MLME_STA_CONNECTED:
 		MSTATE_STA_LD_NUM(&mstate)++;
 		break;
+	case MLME_STA_DISCONNECTED:
+		break;
+#ifdef CONFIG_AP_MODE
 	case MLME_AP_STARTED:
 		MSTATE_AP_NUM(&mstate)++;
 		break;
 	case MLME_AP_STOPPED:
-	case MLME_STA_DISCONNECTED:
+		break;
+#endif
+#ifdef CONFIG_RTW_MESH
+	case MLME_MESH_STARTED:
+		MSTATE_MESH_NUM(&mstate)++;
+		break;
+	case MLME_MESH_STOPPED:
+		break;
+#endif
+	case MLME_ACTION_NONE:
+		/* caller without effect of decision */
+		break;
 	default:
+		rtw_warn_on(1);
 		break;
 	}
 
@@ -3699,8 +3749,8 @@ void rtw_dfs_master_status_apply(_adapter *adapter, u8 self_action)
 		goto apply;
 	}
 
-	if (MSTATE_AP_NUM(&mstate) == 0) {
-		/* No working AP mode */
+	if (!MSTATE_AP_NUM(&mstate) && !MSTATE_MESH_NUM(&mstate)) {
+		/* No working AP/Mesh mode */
 		goto apply;
 	}
 
@@ -3711,8 +3761,9 @@ apply:
 
 	RTW_INFO(FUNC_ADPT_FMT" needed:%d, self_action:%u\n"
 		, FUNC_ADPT_ARG(adapter), needed, self_action);
-	RTW_INFO(FUNC_ADPT_FMT" ld_sta_num:%u, lg_sta_num:%u, ap_num:%u, %u,%u,%u\n"
-		, FUNC_ADPT_ARG(adapter), MSTATE_STA_LD_NUM(&mstate), MSTATE_STA_LG_NUM(&mstate), MSTATE_AP_NUM(&mstate)
+	RTW_INFO(FUNC_ADPT_FMT" ld_sta_num:%u, lg_sta_num:%u, ap_num:%u, mesh_num:%u, %u,%u,%u\n"
+		, FUNC_ADPT_ARG(adapter), MSTATE_STA_LD_NUM(&mstate), MSTATE_STA_LG_NUM(&mstate)
+		, MSTATE_AP_NUM(&mstate), MSTATE_MESH_NUM(&mstate)
 		, u_ch, u_bw, u_offset);
 
 	if (needed == _TRUE)
@@ -3921,6 +3972,7 @@ exit:
 	return res;
 }
 
+#ifdef CONFIG_MP_INCLUDED
 static s32 rtw_mp_cmd_hdl(_adapter *padapter, u8 mp_cmd_id)
 {
 	HAL_DATA_TYPE	*pHalData = GET_HAL_DATA(padapter);
@@ -3945,7 +3997,9 @@ static s32 rtw_mp_cmd_hdl(_adapter *padapter, u8 mp_cmd_id)
 				ret = H2C_REJECTED;
 				goto exit;
 			}
+#ifndef RTW_HALMAC
 			rtw_intf_start(padapter);
+#endif /* !RTW_HALMAC */
 #ifdef RTW_HALMAC /*for New IC*/
 			MPT_InitializeAdapter(padapter, 1);
 #endif /* CONFIG_MP_INCLUDED */
@@ -3980,19 +4034,6 @@ static s32 rtw_mp_cmd_hdl(_adapter *padapter, u8 mp_cmd_id)
 		rtw_write8(padapter, 0x66, 0x27); /*Open BT uart Log*/
 		rtw_write8(padapter, 0xc50, 0x20); /*for RX init Gain*/
 #endif
-#ifdef CONFIG_RTL8188F
-			RTW_INFO("Set reg 0x88c, 0x58, 0x00\n");
-			rfreg0 = phy_query_rf_reg(padapter, RF_PATH_A, 0x0, 0x1f);
-			phy_set_bb_reg(padapter, 0x88c, BIT21|BIT20, 0x3);
-			phy_set_rf_reg(padapter, RF_PATH_A, 0x58, BIT1, 0x1);
-			phy_set_rf_reg(padapter, RF_PATH_A, 0x0, 0xF001f, 0x2001f);
-			rtw_msleep_os(200);
-			phy_set_rf_reg(padapter, RF_PATH_A, 0x0, 0xF001f, 0x30000 | rfreg0);
-			phy_set_rf_reg(padapter, RF_PATH_A, 0x58, BIT1, 0x0);
-			phy_set_bb_reg(padapter, 0x88c, BIT21|BIT20, 0x0);
-			rtw_msleep_os(1000);
-#endif
-
 		odm_write_dig(&pHalData->odmpriv, 0x20);
 
 	} else if (mp_cmd_id == MP_STOP) {
@@ -4007,7 +4048,9 @@ static s32 rtw_mp_cmd_hdl(_adapter *padapter, u8 mp_cmd_id)
 				ret = H2C_REJECTED;
 				goto exit;
 			}
+#ifndef RTW_HALMAC
 			rtw_intf_start(padapter);
+#endif /* !RTW_HALMAC */
 		}
 
 		if (padapter->mppriv.mode != MP_OFF) {
@@ -4081,6 +4124,7 @@ u8 rtw_mp_cmd(_adapter *adapter, u8 mp_cmd_id, u8 flags)
 exit:
 	return res;
 }
+#endif	/*CONFIG_MP_INCLUDED*/
 
 #ifdef CONFIG_RTW_CUSTOMER_STR
 static s32 rtw_customer_str_cmd_hdl(_adapter *adapter, u8 write, const u8 *cstr)
@@ -4635,9 +4679,6 @@ u8 rtw_drvextra_cmd_hdl(_adapter *padapter, unsigned char *pbuf)
 	case RESET_SECURITYPRIV:
 		reset_securitypriv_hdl(padapter);
 		break;
-	case SET_SECURITYPRIV:
-		set_securitypriv_hdl(padapter, pdrvextra_cmd->pbuf);
-		break;
 	case FREE_ASSOC_RESOURCES:
 		free_assoc_resources_hdl(padapter);
 		break;
@@ -4687,13 +4728,25 @@ u8 rtw_drvextra_cmd_hdl(_adapter *padapter, unsigned char *pbuf)
 		rtw_hal_fill_h2c_cmd(padapter, pdrvextra_cmd->pbuf[0], pdrvextra_cmd->size - 1, &pdrvextra_cmd->pbuf[1]);
 		break;
 	case MP_CMD_WK_CID:
+#ifdef CONFIG_MP_INCLUDED
 		ret = rtw_mp_cmd_hdl(padapter, pdrvextra_cmd->type);
+#endif
 		break;
 #ifdef CONFIG_RTW_CUSTOMER_STR
 	case CUSTOMER_STR_WK_CID:
 		ret = rtw_customer_str_cmd_hdl(padapter, pdrvextra_cmd->type, pdrvextra_cmd->pbuf);
 		break;
 #endif
+
+#ifdef CONFIG_RTW_REPEATER_SON
+	case RSON_SCAN_WK_CID:
+		rtw_rson_scan_cmd_hdl(padapter, pdrvextra_cmd->type);
+		break;
+#endif
+
+	case MGNT_TX_WK_CID:
+		ret = rtw_mgnt_tx_handler(padapter, pdrvextra_cmd->pbuf);
+		break;
 	default:
 		break;
 	}
@@ -4838,7 +4891,7 @@ void rtw_setstaKey_cmdrsp_callback(_adapter	*padapter ,  struct cmd_obj *pcmd)
 		goto exit;
 	}
 
-	/* psta->aid = psta->mac_id = psetstakey_rsp->keyid; */ /* CAM_ID(CAM_ENTRY) */
+	/* psta->cmn.aid = psta->cmn.mac_id = psetstakey_rsp->keyid; */ /* CAM_ID(CAM_ENTRY) */
 
 exit:
 
@@ -4860,7 +4913,7 @@ void rtw_setassocsta_cmdrsp_callback(_adapter	*padapter,  struct cmd_obj *pcmd)
 		goto exit;
 	}
 
-	psta->aid = psta->mac_id = passocsta_rsp->cam_id;
+	psta->cmn.aid = psta->cmn.mac_id = passocsta_rsp->cam_id;
 
 	_enter_critical_bh(&pmlmepriv->lock, &irqL);
 

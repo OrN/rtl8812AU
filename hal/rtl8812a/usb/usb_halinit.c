@@ -1,6 +1,6 @@
 /******************************************************************************
  *
- * Copyright(c) 2007 - 2011 Realtek Corporation. All rights reserved.
+ * Copyright(c) 2007 - 2017 Realtek Corporation.
  *
  * This program is free software; you can redistribute it and/or modify it
  * under the terms of version 2 of the GNU General Public License as
@@ -11,12 +11,7 @@
  * FITNESS FOR A PARTICULAR PURPOSE. See the GNU General Public License for
  * more details.
  *
- * You should have received a copy of the GNU General Public License along with
- * this program; if not, write to the Free Software Foundation, Inc.,
- * 51 Franklin Street, Fifth Floor, Boston, MA 02110, USA
- *
- *
- ******************************************************************************/
+ *****************************************************************************/
 #define _HCI_HAL_INIT_C_
 
 /* #include <drv_types.h> */
@@ -165,14 +160,8 @@ void rtl8812au_interface_configure(_adapter *padapter)
 			}
 		}
 #else /* !CONFIG_PREALLOC_RX_SKB_BUFFER */
-#if defined(CONFIG_PLATFORM_HISILICON) && defined(CONFIG_RTL8812A)
-		pHalData->rxagg_usb_size = 3; /*unit 4k for USB aggregation mode */
-		pHalData->rxagg_usb_timeout = 8; /*unit 32us*/
-
-#else
-		pHalData->rxagg_usb_size = 6; /* unit 4k for USB aggregation mode */
-		pHalData->rxagg_usb_timeout = 0x20; /* unit 32us */
-#endif	/* CONFIG_PLATFORM_HISILICON */
+		pHalData->rxagg_usb_size = 0x5;
+		pHalData->rxagg_usb_timeout = 0x20;
 #endif /* CONFIG_PREALLOC_RX_SKB_BUFFER */
 
 	}
@@ -739,24 +728,21 @@ _InitWMACSetting_8812A(
 	/* u4Byte			value32; */
 	u16			value16;
 	HAL_DATA_TYPE	*pHalData = GET_HAL_DATA(Adapter);
+	u32 rcr;
 
-	/* pHalData->ReceiveConfig = AAP | APM | AM | AB | APP_ICV | ADF | AMF | APP_FCS | HTC_LOC_CTRL | APP_MIC | APP_PHYSTS; */
-	pHalData->ReceiveConfig =
+	/* rcr = AAP | APM | AM | AB | APP_ICV | ADF | AMF | APP_FCS | HTC_LOC_CTRL | APP_MIC | APP_PHYSTS; */
+	rcr =
 		RCR_APM | RCR_AM | RCR_AB | RCR_CBSSID_DATA | RCR_CBSSID_BCN | RCR_APP_ICV | RCR_AMF | RCR_HTC_LOC_CTRL | RCR_APP_MIC | RCR_APP_PHYST_RXFF;
 
 #if (1 == RTL8812A_RX_PACKET_INCLUDE_CRC)
-	pHalData->ReceiveConfig |= ACRC32;
+	rcr |= ACRC32;
 #endif
 
 #ifdef CONFIG_RX_PACKET_APPEND_FCS
-	pHalData->ReceiveConfig |= RCR_APPFCS;
+	rcr |= RCR_APPFCS;
 #endif
-
-	if (IS_HARDWARE_TYPE_8812AU(Adapter) || IS_HARDWARE_TYPE_8821U(Adapter))
-		pHalData->ReceiveConfig |= FORCEACK;
-
-	/* some REG_RCR will be modified later by phy_ConfigMACWithHeaderFile() */
-	rtw_write32(Adapter, REG_RCR, pHalData->ReceiveConfig);
+	rcr |= FORCEACK;
+	rtw_hal_set_hwreg(Adapter, HW_VAR_RCR, (u8 *)&rcr);
 
 	/* Accept all multicast address */
 	rtw_write32(Adapter, REG_MAR, 0xFFFFFFFF);
@@ -814,7 +800,7 @@ _InitAdaptiveCtrl_8812AUsb(
 	rtw_write16(Adapter, REG_SPEC_SIFS, value16);
 
 	/* Retry Limit */
-	value16 = _LRL(0x30) | _SRL(0x30);
+	value16 = _LRL(RL_VAL_STA) | _SRL(RL_VAL_STA);
 	rtw_write16(Adapter, REG_RL, value16);
 
 }
@@ -860,7 +846,7 @@ _InitBeaconMaxError_8812A(
 }
 
 
-#ifdef CONFIG_LED
+#ifdef CONFIG_RTW_LED
 static void _InitHWLed(PADAPTER Adapter)
 {
 	struct led_priv *pledpriv = &(Adapter->ledpriv);
@@ -873,7 +859,7 @@ static void _InitHWLed(PADAPTER Adapter)
 	 * must consider cases of antenna diversity/ commbo card/solo card/mini card */
 
 }
-#endif /* CONFIG_LED */
+#endif /* CONFIG_RTW_LED */
 
 static VOID
 _InitRDGSetting_8812A(
@@ -1112,70 +1098,6 @@ USB_AggModeSwitch(
 #endif
 }	/* USB_AggModeSwitch */
 
-static VOID
-_InitOperationMode_8812A(
-	IN	PADAPTER			Adapter
-)
-{
-#if 0/* gtest */
-	PHAL_DATA_TYPE	pHalData = GET_HAL_DATA(Adapter);
-	u1Byte				regBwOpMode = 0;
-	u4Byte				regRATR = 0, regRRSR = 0;
-
-
-	/* 1 This part need to modified according to the rate set we filtered!! */
-	/*  */
-	/* Set RRSR, RATR, and REG_BWOPMODE registers */
-	/*  */
-	switch (Adapter->RegWirelessMode) {
-	case WIRELESS_MODE_B:
-		regBwOpMode = BW_OPMODE_20MHZ;
-		regRATR = RATE_ALL_CCK;
-		regRRSR = RATE_ALL_CCK;
-		break;
-	case WIRELESS_MODE_A:
-		regBwOpMode = BW_OPMODE_5G | BW_OPMODE_20MHZ;
-		regRATR = RATE_ALL_OFDM_AG;
-		regRRSR = RATE_ALL_OFDM_AG;
-		break;
-	case WIRELESS_MODE_G:
-		regBwOpMode = BW_OPMODE_20MHZ;
-		regRATR = RATE_ALL_CCK | RATE_ALL_OFDM_AG;
-		regRRSR = RATE_ALL_CCK | RATE_ALL_OFDM_AG;
-		break;
-	case WIRELESS_MODE_AUTO:
-		if (Adapter->bInHctTest) {
-			regBwOpMode = BW_OPMODE_20MHZ;
-			regRATR = RATE_ALL_CCK | RATE_ALL_OFDM_AG;
-			regRRSR = RATE_ALL_CCK | RATE_ALL_OFDM_AG;
-		} else {
-			regBwOpMode = BW_OPMODE_20MHZ;
-			regRATR = RATE_ALL_CCK | RATE_ALL_OFDM_AG | RATE_ALL_OFDM_1SS | RATE_ALL_OFDM_2SS;
-			regRRSR = RATE_ALL_CCK | RATE_ALL_OFDM_AG;
-		}
-		break;
-	case WIRELESS_MODE_N_24G:
-		/* It support CCK rate by default. */
-		/* CCK rate will be filtered out only when associated AP does not support it. */
-		regBwOpMode = BW_OPMODE_20MHZ;
-		regRATR = RATE_ALL_CCK | RATE_ALL_OFDM_AG | RATE_ALL_OFDM_1SS | RATE_ALL_OFDM_2SS;
-		regRRSR = RATE_ALL_CCK | RATE_ALL_OFDM_AG;
-		break;
-	case WIRELESS_MODE_N_5G:
-		regBwOpMode = BW_OPMODE_5G;
-		regRATR = RATE_ALL_OFDM_AG | RATE_ALL_OFDM_1SS | RATE_ALL_OFDM_2SS;
-		regRRSR = RATE_ALL_OFDM_AG;
-		break;
-
-	default: /* for MacOSX compiler warning. */
-		break;
-	}
-
-	/* Ziv ???????? */
-	/* PlatformEFIOWrite4Byte(Adapter, REG_INIRTS_RATE_SEL, regRRSR); */
-	PlatformEFIOWrite1Byte(Adapter, REG_BWOPMODE, regBwOpMode);
-#endif
-}
 
 
 /* Set CCK and OFDM Block "ON" */
@@ -1198,7 +1120,7 @@ static VOID _RfPowerSave(
 #if 0
 	HAL_DATA_TYPE	*pHalData	= GET_HAL_DATA(Adapter);
 	PMGNT_INFO		pMgntInfo	= &(Adapter->MgntInfo);
-	u1Byte			eRFPath;
+	enum rf_path			eRFPath;
 
 #if (DISABLE_BB_RF)
 	return;
@@ -1352,7 +1274,7 @@ u32 rtl8812au_hal_init(PADAPTER Adapter)
 
 	rt_rf_power_state		eRfPowerStateToSet;
 
-	u32 init_start_time = rtw_get_current_time();
+	systime init_start_time = rtw_get_current_time();
 
 
 #ifdef DBG_HAL_INIT_PROFILING
@@ -1414,7 +1336,7 @@ u32 rtl8812au_hal_init(PADAPTER Adapter)
 	};
 
 	int hal_init_profiling_i;
-	u32 hal_init_stages_timestamp[HAL_INIT_STAGES_NUM]; /* used to record the time of each stage's starting point */
+	systime hal_init_stages_timestamp[HAL_INIT_STAGES_NUM]; /* used to record the time of each stage's starting point */
 
 	for (hal_init_profiling_i = 0; hal_init_profiling_i < HAL_INIT_STAGES_NUM; hal_init_profiling_i++)
 		hal_init_stages_timestamp[hal_init_profiling_i] = 0;
@@ -1572,7 +1494,7 @@ u32 rtl8812au_hal_init(PADAPTER Adapter)
 
 	_InitRetryFunction_8812A(Adapter);
 	init_UsbAggregationSetting_8812A(Adapter);
-	_InitOperationMode_8812A(Adapter);/* todo */
+
 	_InitBeaconParameters_8812A(Adapter);
 	_InitBeaconMaxError_8812A(Adapter, _TRUE);
 
@@ -1603,9 +1525,9 @@ u32 rtl8812au_hal_init(PADAPTER Adapter)
 #endif /* CONFIG_CONCURRENT_MODE || CONFIG_TX_MCAST2UNI */
 
 
-#ifdef CONFIG_LED
+#ifdef CONFIG_RTW_LED
 	_InitHWLed(Adapter);
-#endif /* CONFIG_LED */
+#endif /* CONFIG_RTW_LED */
 
 	/*  */
 	/* d. Initialize BB related configurations. */
@@ -2119,6 +2041,7 @@ hal_CustomizedBehavior_8812AU(
 	IN	PADAPTER	Adapter
 )
 {
+#ifdef CONFIG_RTW_SW_LED
 	HAL_DATA_TYPE	*pHalData = GET_HAL_DATA(Adapter);
 	struct led_priv	*pledpriv = &(Adapter->ledpriv);
 
@@ -2172,6 +2095,7 @@ hal_CustomizedBehavior_8812AU(
 	}
 
 	pHalData->bLedOpenDrain = _TRUE;/* Support Open-drain arrangement for controlling the LED. Added by Roger, 2009.10.16. */
+#endif
 }
 
 static void
@@ -2276,13 +2200,15 @@ ReadLEDSetting_8812AU(
 	IN	BOOLEAN		AutoloadFail
 )
 {
+#ifdef CONFIG_RTW_LED
 	struct led_priv *pledpriv = &(Adapter->ledpriv);
 
-#ifdef CONFIG_SW_LED
+#ifdef CONFIG_RTW_SW_LED
 	pledpriv->bRegUseLed = _TRUE;
 #else /* HW LED */
 	pledpriv->LedStrategy = HW_LED;
-#endif /* CONFIG_SW_LED */
+#endif /* CONFIG_RTW_SW_LED */
+#endif
 }
 
 VOID
@@ -2391,11 +2317,12 @@ void UpdateInterruptMask8812AU(PADAPTER padapter, u8 bHIMR0 , u32 AddMSR, u32 Re
 
 }
 
-void SetHwReg8812AU(PADAPTER Adapter, u8 variable, u8 *val)
+u8 SetHwReg8812AU(PADAPTER Adapter, u8 variable, u8 *val)
 {
 	HAL_DATA_TYPE	*pHalData = GET_HAL_DATA(Adapter);
 	struct pwrctrl_priv *pwrctl = adapter_to_pwrctl(Adapter);
 	struct registry_priv *registry_par = &Adapter->registrypriv;
+	u8 ret = _SUCCESS;
 
 	switch (variable) {
 	case HW_VAR_RXDMA_AGG_PG_TH:
@@ -2472,10 +2399,11 @@ void SetHwReg8812AU(PADAPTER Adapter, u8 variable, u8 *val)
 		}
 		break;
 	default:
-		SetHwReg8812A(Adapter, variable, val);
+		ret = SetHwReg8812A(Adapter, variable, val);
 		break;
 	}
 
+	return ret;
 }
 
 void GetHwReg8812AU(PADAPTER Adapter, u8 variable, u8 *val)
@@ -2660,13 +2588,10 @@ void rtl8812au_set_hal_ops(_adapter *padapter)
 
 	pHalFunc->init_recv_priv = &rtl8812au_init_recv_priv;
 	pHalFunc->free_recv_priv = &rtl8812au_free_recv_priv;
-#ifdef CONFIG_SW_LED
+#ifdef CONFIG_RTW_SW_LED
 	pHalFunc->InitSwLeds = &rtl8812au_InitSwLeds;
 	pHalFunc->DeInitSwLeds = &rtl8812au_DeInitSwLeds;
-#else /* case of hw led or no led */
-	pHalFunc->InitSwLeds = NULL;
-	pHalFunc->DeInitSwLeds = NULL;
-#endif/* CONFIG_SW_LED */
+#endif/* CONFIG_RTW_SW_LED */
 
 	pHalFunc->init_default_value = &rtl8812au_init_default_value;
 	pHalFunc->intf_chip_configure = &rtl8812au_interface_configure;

@@ -1,6 +1,6 @@
 /******************************************************************************
  *
- * Copyright(c) 2007 - 2011 Realtek Corporation. All rights reserved.
+ * Copyright(c) 2007 - 2017 Realtek Corporation.
  *
  * This program is free software; you can redistribute it and/or modify it
  * under the terms of version 2 of the GNU General Public License as
@@ -11,12 +11,7 @@
  * FITNESS FOR A PARTICULAR PURPOSE. See the GNU General Public License for
  * more details.
  *
- * You should have received a copy of the GNU General Public License along with
- * this program; if not, write to the Free Software Foundation, Inc.,
- * 51 Franklin Street, Fifth Floor, Boston, MA 02110, USA
- *
- *
- ******************************************************************************/
+ *****************************************************************************/
 #ifndef __RTW_DEBUG_H__
 #define __RTW_DEBUG_H__
 
@@ -351,7 +346,7 @@ void bb_reg_dump(void *sel, _adapter *adapter);
 void bb_reg_dump_ex(void *sel, _adapter *adapter);
 void rf_reg_dump(void *sel, _adapter *adapter);
 
-void rtw_sink_rtp_seq_dbg(_adapter *adapter, _pkt *pkt);
+void rtw_sink_rtp_seq_dbg(_adapter *adapter, u8 *ehdr_pos);
 
 struct sta_info;
 void sta_rx_reorder_ctl_dump(void *sel, struct sta_info *sta);
@@ -397,6 +392,10 @@ ssize_t proc_set_backop_flags_sta(struct file *file, const char __user *buffer, 
 int proc_get_backop_flags_ap(struct seq_file *m, void *v);
 ssize_t proc_set_backop_flags_ap(struct file *file, const char __user *buffer, size_t count, loff_t *pos, void *data);
 #endif /* CONFIG_SCAN_BACKOP */
+#ifdef CONFIG_RTW_REPEATER_SON
+int proc_get_rson_data(struct seq_file *m, void *v);
+ssize_t proc_set_rson_data(struct file *file, const char __user *buffer, size_t count, loff_t *pos, void *data);
+#endif
 int proc_get_survey_info(struct seq_file *m, void *v);
 ssize_t proc_set_survey_info(struct file *file, const char __user *buffer, size_t count, loff_t *pos, void *data);
 int proc_get_ap_info(struct seq_file *m, void *v);
@@ -413,6 +412,12 @@ ssize_t proc_set_bw_ctl(struct file *file, const char __user *buffer, size_t cou
 int proc_get_rx_cnt_dump(struct seq_file *m, void *v);
 ssize_t proc_set_rx_cnt_dump(struct file *file, const char __user *buffer, size_t count, loff_t *pos, void *data);
 #endif
+
+#ifdef CONFIG_AP_MODE
+int proc_get_bmc_tx_rate(struct seq_file *m, void *v);
+ssize_t proc_set_bmc_tx_rate(struct file *file, const char __user *buffer, size_t count, loff_t *pos, void *data);
+#endif /*CONFIG_AP_MODE*/
+
 int proc_get_dis_pwt(struct seq_file *m, void *v);
 ssize_t proc_set_dis_pwt(struct file *file, const char __user *buffer, size_t count, loff_t *pos, void *data);
 
@@ -490,6 +495,9 @@ ssize_t proc_set_txbf_cap(struct file *file, const char __user *buffer, size_t c
 int proc_get_rx_ampdu_factor(struct seq_file *m, void *v);
 ssize_t proc_set_rx_ampdu_factor(struct file *file, const char __user *buffer, size_t count, loff_t *pos, void *data);
 
+int proc_get_tx_max_agg_num(struct seq_file *m, void *v);
+ssize_t proc_set_tx_max_agg_num(struct file *file, const char __user *buffer, size_t count, loff_t *pos, void *data);
+
 int proc_get_rx_ampdu_density(struct seq_file *m, void *v);
 ssize_t proc_set_rx_ampdu_density(struct file *file, const char __user *buffer, size_t count, loff_t *pos, void *data);
 
@@ -541,11 +549,18 @@ int proc_get_int_logs(struct seq_file *m, void *v);
 int proc_get_rx_ring(struct seq_file *m, void *v);
 int proc_get_tx_ring(struct seq_file *m, void *v);
 int proc_get_pci_aspm(struct seq_file *m, void *v);
+#ifdef DBG_TXBD_DESC_DUMP
+int proc_get_tx_ring_ext(struct seq_file *m, void *v);
+ssize_t proc_set_tx_ring_ext(struct file *file, const char __user *buffer, size_t count, loff_t *pos, void *data);
+#endif
 #endif
 
 #ifdef CONFIG_WOWLAN
 int proc_get_pattern_info(struct seq_file *m, void *v);
 ssize_t proc_set_pattern_info(struct file *file, const char __user *buffer,
+		size_t count, loff_t *pos, void *data);
+int proc_get_wakeup_event(struct seq_file *m, void *v);
+ssize_t proc_set_wakeup_event(struct file *file, const char __user *buffer,
 		size_t count, loff_t *pos, void *data);
 int proc_get_wakeup_reason(struct seq_file *m, void *v);
 #endif
@@ -565,9 +580,15 @@ ssize_t proc_set_new_bcn_max(struct file *file, const char __user *buffer, size_
 
 #ifdef CONFIG_POWER_SAVING
 int proc_get_ps_info(struct seq_file *m, void *v);
+#ifdef CONFIG_WMMPS_STA	
+int proc_get_wmmps_info(struct seq_file *m, void *v);
+ssize_t proc_set_wmmps_info(struct file *file, const char __user *buffer, size_t count, loff_t *pos, void *data);
+#endif /* CONFIG_WMMPS_STA */
 #endif /* CONFIG_POWER_SAVING */
 
 #ifdef CONFIG_TDLS
+int proc_get_tdls_enable(struct seq_file *m, void *v);
+ssize_t proc_set_tdls_enable(struct file *file, const char __user *buffer, size_t count, loff_t *pos, void *data);
 int proc_get_tdls_info(struct seq_file *m, void *v);
 #endif
 
@@ -611,9 +632,23 @@ int proc_get_mcc_policy_table(struct seq_file *m, void *v);
 ssize_t proc_set_mcc_policy_table(struct file *file, const char __user *buffer, size_t count, loff_t *pos, void *data);
 #endif /* CONFIG_MCC_MODE */
 
+#ifdef CONFIG_LED_CONTROL
+int proc_get_led_enable(struct seq_file *m, void *v);
+ssize_t proc_set_led_enable(struct file *file, const char __user *buffer, size_t count, loff_t *pos, void *data);
+#endif //CONFIG_LED_CONTROL
+
 int proc_get_ack_timeout(struct seq_file *m, void *v);
 ssize_t proc_set_ack_timeout(struct file *file, const char __user *buffer, size_t count, loff_t *pos, void *data);
 
+int proc_get_iqk_fw_offload(struct seq_file *m, void *v);
+ssize_t proc_set_iqk_fw_offload(struct file *file, const char __user *buffer, size_t count, loff_t *pos, void *data);
+
+#ifdef CONFIG_DBG_RF_CAL
+int proc_get_iqk_info(struct seq_file *m, void *v);
+ssize_t proc_set_iqk(struct file *file, const char __user *buffer, size_t count, loff_t *pos, void *data);
+int proc_get_lck_info(struct seq_file *m, void *v);
+ssize_t proc_set_lck(struct file *file, const char __user *buffer, size_t count, loff_t *pos, void *data);
+#endif /*CONFIG_DBG_RF_CAL*/
 
 #define _drv_always_		1
 #define _drv_emerg_			2

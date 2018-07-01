@@ -1,6 +1,6 @@
 /******************************************************************************
  *
- * Copyright(c) 2007 - 2011 Realtek Corporation. All rights reserved.
+ * Copyright(c) 2007 - 2017 Realtek Corporation.
  *
  * This program is free software; you can redistribute it and/or modify it
  * under the terms of version 2 of the GNU General Public License as
@@ -11,12 +11,7 @@
  * FITNESS FOR A PARTICULAR PURPOSE. See the GNU General Public License for
  * more details.
  *
- * You should have received a copy of the GNU General Public License along with
- * this program; if not, write to the Free Software Foundation, Inc.,
- * 51 Franklin Street, Fifth Floor, Boston, MA 02110, USA
- *
- *
- ******************************************************************************/
+ *****************************************************************************/
 #define _RTL8812AU_XMIT_C_
 
 /* #include <drv_types.h> */
@@ -57,6 +52,12 @@ static s32 update_txdesc(struct xmit_frame *pxmitframe, u8 *pmem, s32 sz , u8 ba
 	struct mlme_ext_priv	*pmlmeext = &padapter->mlmeextpriv;
 	struct mlme_ext_info	*pmlmeinfo = &(pmlmeext->mlmext_info);
 	sint	bmcst = IS_MCAST(pattrib->ra);
+	struct sta_info *psta = NULL;
+	u8 max_agg_num = 0;
+	u8 _max_ampdu_size = 0;
+	u8 ht_max_ampdu_size = 0;
+	u8 vht_max_ampdu_size = 0;
+	struct dvobj_priv	*pdvobjpriv = adapter_to_dvobj(padapter);
 
 #ifndef CONFIG_USE_USB_BUFFER_ALLOC_TX
 	if (padapter->registrypriv.mp_mode == 0) {
@@ -148,7 +149,49 @@ static s32 update_txdesc(struct xmit_frame *pxmitframe, u8 *pmem, s32 sz , u8 ba
 
 			if (pattrib->ampdu_en == _TRUE) {
 				SET_TX_DESC_AGG_ENABLE_8812(ptxdesc, 1);
-				SET_TX_DESC_MAX_AGG_NUM_8812(ptxdesc, 0x1f);
+				if (padapter->driver_tx_max_agg_num != 0xFF) {
+					max_agg_num = padapter->driver_tx_max_agg_num; /* tx desc max_agg_num (unit:2)  */
+				} else {
+					psta = pattrib->psta;
+
+					ht_max_ampdu_size = psta->htpriv.ht_cap.ampdu_params_info & 0x3; /*get other side sta ht max rx ampdu size*/
+					/*RTW_INFO("%s, ht_max_ampdu_size=0x%02x\n", __func__, ht_max_ampdu_size);*/
+
+					vht_max_ampdu_size = psta->vhtpriv.ampdu_len;
+					/*RTW_INFO("%s, vht_max_ampdu_size=0x%02x\n", __func__, vht_max_ampdu_size);*/
+
+					if (vht_max_ampdu_size > ht_max_ampdu_size)
+						_max_ampdu_size = vht_max_ampdu_size;
+					else
+						_max_ampdu_size = ht_max_ampdu_size;
+
+					/* Calculate tx desc max_agg_num (unit:2)  */
+					if (_max_ampdu_size == MAX_AMPDU_FACTOR_1M)
+						max_agg_num = (1024 * 1024 / sz) / 2;
+					else if (_max_ampdu_size == MAX_AMPDU_FACTOR_512K)
+						max_agg_num = (512 * 1024 / sz) / 2;
+					else if (_max_ampdu_size == MAX_AMPDU_FACTOR_256K)
+						max_agg_num = (256 * 1024 / sz) / 2;
+					else if (_max_ampdu_size == MAX_AMPDU_FACTOR_128K)
+						max_agg_num = (128 * 1024 / sz) / 2;
+					else if (_max_ampdu_size == MAX_AMPDU_FACTOR_64K)
+						max_agg_num = (64 * 1024 / sz) / 2;
+					else if (_max_ampdu_size == MAX_AMPDU_FACTOR_32K)
+						max_agg_num = (32 * 1024 / sz)  / 2;
+					else if (_max_ampdu_size == MAX_AMPDU_FACTOR_16K)
+						max_agg_num = (16 * 1024 / sz)  / 2;
+					else if (_max_ampdu_size == MAX_AMPDU_FACTOR_8K)
+						max_agg_num = (8 * 1024 / sz) / 2;
+					/*RTW_INFO("%s, sz=%u , _max_ampdu_size=0x%02x\n", __func__, sz, _max_ampdu_size);*/
+					if (psta->max_agg_num_minimal_record == 0 || psta->max_agg_num_minimal_record > max_agg_num)
+						psta->max_agg_num_minimal_record = max_agg_num;
+					if (pdvobjpriv->traffic_stat.cur_tx_tp > 10 && pdvobjpriv->traffic_stat.cur_rx_tp > 10)
+						max_agg_num = psta->max_agg_num_minimal_record;
+				}
+				if (max_agg_num >= 0x1F)
+					max_agg_num = 0x1F;
+				/* RTW_INFO("%s, max_agg_num=0x%02x\n", __func__, max_agg_num); */
+				SET_TX_DESC_MAX_AGG_NUM_8812(ptxdesc, max_agg_num);
 				/* Set A-MPDU aggregation. */
 				SET_TX_DESC_AMPDU_DENSITY_8812(ptxdesc, pattrib->ampdu_spacing);
 			} else
@@ -167,6 +210,8 @@ static s32 update_txdesc(struct xmit_frame *pxmitframe, u8 *pmem, s32 sz , u8 ba
 
 				SET_TX_DESC_TX_RATE_8812(ptxdesc, (pHalData->INIDATA_RATE[pattrib->mac_id] & 0x7F));
 			}
+			if (bmcst)
+				fill_txdesc_bmc_tx_rate(pattrib, ptxdesc);
 
 			if (padapter->fix_rate != 0xFF) { /* modify data rate by iwpriv */
 				SET_TX_DESC_USE_RATE_8812(ptxdesc, 1);
@@ -473,24 +518,6 @@ static s32 rtw_dump_xframe(_adapter *padapter, struct xmit_frame *pxmitframe)
 }
 
 #ifdef CONFIG_USB_TX_AGGREGATION
-static u32 xmitframe_need_length(struct xmit_frame *pxmitframe)
-{
-	struct pkt_attrib *pattrib = &pxmitframe->attrib;
-
-	u32	len = 0;
-
-	/* no consider fragement */
-	len = pattrib->hdrlen + pattrib->iv_len +
-	      SNAP_SIZE + sizeof(u16) +
-	      pattrib->pktlen +
-	      ((pattrib->bswenc) ? pattrib->icv_len : 0);
-
-	if (pattrib->encrypt == _TKIP_)
-		len += 8;
-
-	return len;
-}
-
 #define IDEA_CONDITION 1	/* check all packets before enqueue */
 s32 rtl8812au_xmitframe_complete(_adapter *padapter, struct xmit_priv *pxmitpriv, struct xmit_buf *pxmitbuf)
 {
@@ -591,7 +618,7 @@ s32 rtl8812au_xmitframe_complete(_adapter *padapter, struct xmit_priv *pxmitpriv
 
 	/* 3 2. aggregate same priority and same DA(AP or STA) frames */
 	pfirstframe = pxmitframe;
-	len = xmitframe_need_length(pfirstframe) + TXDESC_SIZE + (pfirstframe->pkt_offset * PACKET_OFFSET_SZ);
+	len = rtw_wlan_pkt_size(pfirstframe) + TXDESC_SIZE + (pfirstframe->pkt_offset * PACKET_OFFSET_SZ);
 	pbuf_tail = len;
 	pbuf = _RND8(pbuf_tail);
 
@@ -662,7 +689,7 @@ s32 rtl8812au_xmitframe_complete(_adapter *padapter, struct xmit_priv *pxmitpriv
 		pxmitframe->pkt_offset = 0; /* not first frame of aggregation, no need to reserve offset */
 #endif
 
-		len = xmitframe_need_length(pxmitframe) + TXDESC_SIZE + (pxmitframe->pkt_offset * PACKET_OFFSET_SZ);
+		len = rtw_wlan_pkt_size(pxmitframe) + TXDESC_SIZE + (pxmitframe->pkt_offset * PACKET_OFFSET_SZ);
 
 		if (_RND8(pbuf + len) > MAX_XMITBUF_SZ)
 			/* if (_RND8(pbuf + len) > (MAX_XMITBUF_SZ/2))//to do : for TX TP finial tune , Georgia 2012-0323 */

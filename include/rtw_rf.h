@@ -1,6 +1,6 @@
 /******************************************************************************
  *
- * Copyright(c) 2007 - 2011 Realtek Corporation. All rights reserved.
+ * Copyright(c) 2007 - 2017 Realtek Corporation.
  *
  * This program is free software; you can redistribute it and/or modify it
  * under the terms of version 2 of the GNU General Public License as
@@ -11,12 +11,7 @@
  * FITNESS FOR A PARTICULAR PURPOSE. See the GNU General Public License for
  * more details.
  *
- * You should have received a copy of the GNU General Public License along with
- * this program; if not, write to the Free Software Foundation, Inc.,
- * 51 Franklin Street, Fifth Floor, Boston, MA 02110, USA
- *
- *
- ******************************************************************************/
+ *****************************************************************************/
 #ifndef	__RTW_RF_H_
 #define __RTW_RF_H_
 
@@ -84,13 +79,6 @@ enum	_REG_PREAMBLE_MODE {
 	PREAMBLE_SHORT	= 3,
 };
 
-typedef enum _RF_PATH {
-	RF_PATH_A = 0,
-	RF_PATH_B = 1,
-	RF_PATH_C = 2,
-	RF_PATH_D = 3,
-} RF_PATH, *PRF_PATH;
-
 #define rf_path_char(path) (((path) >= RF_PATH_MAX) ? 'X' : 'A' + (path))
 
 /* Bandwidth Offset */
@@ -111,16 +99,6 @@ extern const char *const _band_str[];
 extern const u8 _band_to_band_cap[];
 #define band_to_band_cap(band) (((band) >= BAND_MAX) ? _band_to_band_cap[BAND_MAX] : _band_to_band_cap[(band)])
 
-/* Represent Channel Width in HT Capabilities
- *   */
-typedef enum _CHANNEL_WIDTH {
-	CHANNEL_WIDTH_20 = 0,
-	CHANNEL_WIDTH_40 = 1,
-	CHANNEL_WIDTH_80 = 2,
-	CHANNEL_WIDTH_160 = 3,
-	CHANNEL_WIDTH_80_80 = 4,
-	CHANNEL_WIDTH_MAX = 5,
-} CHANNEL_WIDTH, *PCHANNEL_WIDTH;
 
 extern const char *const _ch_width_str[];
 #define ch_width_str(bw) (((bw) >= CHANNEL_WIDTH_MAX) ? _ch_width_str[CHANNEL_WIDTH_MAX] : _ch_width_str[(bw)])
@@ -159,21 +137,7 @@ typedef enum _PROTECTION_MODE {
 	PROTECTION_MODE_FORCE_DISABLE = 2,
 } PROTECTION_MODE, *PPROTECTION_MODE;
 
-typedef	enum _RT_RF_TYPE_DEFINITION {
-	RF_1T2R = 0,
-	RF_2T4R = 1,
-	RF_2T2R = 2,
-	RF_1T1R = 3,
-	RF_2T2R_GREEN = 4,
-	RF_2T3R = 5,
-	RF_3T3R = 6,
-	RF_3T4R	= 7,
-	RF_4T4R	= 8,
-
-	RF_TYPE_AUTO,
-} RT_RF_TYPE_DEF_E;
-
-#define RF_TYPE_VALID(rf_type) (rf_type < RF_TYPE_AUTO)
+#define RF_TYPE_VALID(rf_type) (rf_type < RF_TYPE_MAX)
 
 extern const u8 _rf_type_to_rf_tx_cnt[];
 #define rf_type_to_rf_tx_cnt(rf_type) (RF_TYPE_VALID(rf_type) ? _rf_type_to_rf_tx_cnt[rf_type] : 0)
@@ -222,6 +186,46 @@ struct country_chplan {
 #endif
 
 const struct country_chplan *rtw_get_chplan_from_country(const char *country_code);
+
+struct rf_ctl_t;
+
+typedef enum _REGULATION_TXPWR_LMT {
+	TXPWR_LMT_NONE = 0, /* no limit */
+	TXPWR_LMT_FCC = 1,
+	TXPWR_LMT_MKK = 2,
+	TXPWR_LMT_ETSI = 3,
+	TXPWR_LMT_IC = 4,
+	TXPWR_LMT_KCC = 5,
+	TXPWR_LMT_WW = 6, /* smallest of all available limit, keep last */
+} REGULATION_TXPWR_LMT;
+
+extern const char *const _regd_str[];
+#define regd_str(regd) (((regd) > TXPWR_LMT_WW) ? _regd_str[TXPWR_LMT_WW] : _regd_str[(regd)])
+
+#ifdef CONFIG_TXPWR_LIMIT
+struct regd_exc_ent {
+	_list list;
+	char country[2];
+	u8 domain;
+	char regd_name[0];
+};
+
+void dump_regd_exc_list(void *sel, struct rf_ctl_t *rfctl);
+void rtw_regd_exc_add_with_nlen(struct rf_ctl_t *rfctl, const char *country, u8 domain, const char *regd_name, u32 nlen);
+void rtw_regd_exc_add(struct rf_ctl_t *rfctl, const char *country, u8 domain, const char *regd_name);
+struct regd_exc_ent *_rtw_regd_exc_search(struct rf_ctl_t *rfctl, const char *country, u8 domain);
+struct regd_exc_ent *rtw_regd_exc_search(struct rf_ctl_t *rfctl, const char *country, u8 domain);
+void rtw_regd_exc_list_free(struct rf_ctl_t *rfctl);
+
+void dump_txpwr_lmt(void *sel, _adapter *adapter);
+void rtw_txpwr_lmt_add_with_nlen(struct rf_ctl_t *rfctl, const char *regd_name, u32 nlen
+	, u8 band, u8 bw, u8 tlrs, u8 ntx_idx, u8 ch_idx, s8 lmt);
+void rtw_txpwr_lmt_add(struct rf_ctl_t *rfctl, const char *regd_name
+	, u8 band, u8 bw, u8 tlrs, u8 ntx_idx, u8 ch_idx, s8 lmt);
+struct txpwr_lmt_ent *_rtw_txpwr_lmt_get_by_name(struct rf_ctl_t *rfctl, const char *regd_name);
+struct txpwr_lmt_ent *rtw_txpwr_lmt_get_by_name(struct rf_ctl_t *rfctl, const char *regd_name);
+void rtw_txpwr_lmt_list_free(struct rf_ctl_t *rfctl);
+#endif /* CONFIG_TXPWR_LIMIT */
 
 #define BB_GAIN_2G 0
 #ifdef CONFIG_IEEE80211_BAND_5GHZ

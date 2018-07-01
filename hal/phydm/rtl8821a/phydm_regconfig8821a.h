@@ -27,7 +27,7 @@ odm_config_rf_reg_8821a(
 	struct PHY_DM_STRUCT				*p_dm_odm,
 	u32					addr,
 	u32					data,
-	enum odm_rf_radio_path_e     RF_PATH,
+	enum rf_path     RF_PATH,
 	u32				    reg_addr
 );
 

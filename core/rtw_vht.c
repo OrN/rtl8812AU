@@ -1,6 +1,6 @@
 /******************************************************************************
  *
- * Copyright(c) 2007 - 2011 Realtek Corporation. All rights reserved.
+ * Copyright(c) 2007 - 2017 Realtek Corporation.
  *
  * This program is free software; you can redistribute it and/or modify it
  * under the terms of version 2 of the GNU General Public License as
@@ -11,12 +11,7 @@
  * FITNESS FOR A PARTICULAR PURPOSE. See the GNU General Public License for
  * more details.
  *
- * You should have received a copy of the GNU General Public License along with
- * this program; if not, write to the Free Software Foundation, Inc.,
- * 51 Franklin Street, Fifth Floor, Boston, MA 02110, USA
- *
- *
- ******************************************************************************/
+ *****************************************************************************/
 #define _RTW_VHT_C
 
 #include <drv_types.h>
@@ -266,56 +261,14 @@ u64	rtw_vht_mcs_map_to_bitmap(u8 *mcs_map, u8 nss)
 	return bitmap;
 }
 
-void	update_sta_vht_info_apmode(_adapter *padapter, PVOID sta)
+#ifdef CONFIG_BEAMFORMING
+void update_sta_vht_info_apmode_bf_cap(_adapter *padapter, struct sta_info *psta)
 {
-	struct sta_info	*psta = (struct sta_info *)sta;
 	struct mlme_priv	*pmlmepriv = &(padapter->mlmepriv);
-	struct mlme_ext_priv	*pmlmeext = &padapter->mlmeextpriv;
 	struct vht_priv	*pvhtpriv_ap = &pmlmepriv->vhtpriv;
 	struct vht_priv	*pvhtpriv_sta = &psta->vhtpriv;
-	struct ht_priv		*phtpriv_sta = &psta->htpriv;
-	u8	cur_ldpc_cap = 0, cur_stbc_cap = 0, bw_mode = 0;
 	u16	cur_beamform_cap = 0;
-	u8	*pcap_mcs;
 
-	if (pvhtpriv_sta->vht_option == _FALSE)
-		return;
-
-	bw_mode = GET_VHT_OPERATING_MODE_FIELD_CHNL_WIDTH(&pvhtpriv_sta->vht_op_mode_notify);
-
-	/* if (bw_mode > psta->bw_mode) */
-	psta->bw_mode = bw_mode;
-
-	/* B4 Rx LDPC */
-	if (TEST_FLAG(pvhtpriv_ap->ldpc_cap, LDPC_VHT_ENABLE_TX) &&
-	    GET_VHT_CAPABILITY_ELE_RX_LDPC(pvhtpriv_sta->vht_cap)) {
-		SET_FLAG(cur_ldpc_cap, (LDPC_VHT_ENABLE_TX | LDPC_VHT_CAP_TX));
-		RTW_INFO("Current STA(%d) VHT LDPC = %02X\n", psta->aid, cur_ldpc_cap);
-	}
-	pvhtpriv_sta->ldpc_cap = cur_ldpc_cap;
-
-	if (psta->bw_mode > pmlmeext->cur_bwmode)
-		psta->bw_mode = pmlmeext->cur_bwmode;
-
-	if (psta->bw_mode == CHANNEL_WIDTH_80) {
-		/* B5 Short GI for 80 MHz */
-		pvhtpriv_sta->sgi_80m = (GET_VHT_CAPABILITY_ELE_SHORT_GI80M(pvhtpriv_sta->vht_cap) & pvhtpriv_ap->sgi_80m) ? _TRUE : _FALSE;
-		/* RTW_INFO("Current STA ShortGI80MHz = %d\n", pvhtpriv_sta->sgi_80m); */
-	} else if (psta->bw_mode >= CHANNEL_WIDTH_160) {
-		/* B5 Short GI for 80 MHz */
-		pvhtpriv_sta->sgi_80m = (GET_VHT_CAPABILITY_ELE_SHORT_GI160M(pvhtpriv_sta->vht_cap) & pvhtpriv_ap->sgi_80m) ? _TRUE : _FALSE;
-		/* RTW_INFO("Current STA ShortGI160MHz = %d\n", pvhtpriv_sta->sgi_80m); */
-	}
-
-	/* B8 B9 B10 Rx STBC */
-	if (TEST_FLAG(pvhtpriv_ap->stbc_cap, STBC_VHT_ENABLE_TX) &&
-	    GET_VHT_CAPABILITY_ELE_RX_STBC(pvhtpriv_sta->vht_cap)) {
-		SET_FLAG(cur_stbc_cap, (STBC_VHT_ENABLE_TX | STBC_VHT_CAP_TX));
-		RTW_INFO("Current STA(%d) VHT STBC = %02X\n", psta->aid, cur_stbc_cap);
-	}
-	pvhtpriv_sta->stbc_cap = cur_stbc_cap;
-
-#ifdef CONFIG_BEAMFORMING
 	/* B11 SU Beamformer Capable, the target supports Beamformer and we are Beamformee */
 	if (TEST_FLAG(pvhtpriv_ap->beamform_cap, BEAMFORMING_VHT_BEAMFORMER_ENABLE) &&
 	    GET_VHT_CAPABILITY_ELE_SU_BFEE(pvhtpriv_sta->vht_cap)) {
@@ -331,9 +284,65 @@ void	update_sta_vht_info_apmode(_adapter *padapter, PVOID sta)
 		/*Shit to BEAMFORMING_VHT_BEAMFORMEE_SOUND_DIM*/
 		SET_FLAG(cur_beamform_cap, GET_VHT_CAPABILITY_ELE_SU_BFER_SOUND_DIM_NUM(pvhtpriv_sta->vht_cap) << 12);
 	}
-	pvhtpriv_sta->beamform_cap = cur_beamform_cap;
+
 	if (cur_beamform_cap)
-		RTW_INFO("Current STA(%d) VHT Beamforming Setting = %02X\n", psta->aid, cur_beamform_cap);
+		RTW_INFO("Current STA(%d) VHT Beamforming Setting = %02X\n", psta->cmn.aid, cur_beamform_cap);
+
+	pvhtpriv_sta->beamform_cap = cur_beamform_cap;
+	psta->cmn.bf_info.vht_beamform_cap = cur_beamform_cap;
+}
+#endif
+
+void	update_sta_vht_info_apmode(_adapter *padapter, PVOID sta)
+{
+	struct sta_info	*psta = (struct sta_info *)sta;
+	struct mlme_priv	*pmlmepriv = &(padapter->mlmepriv);
+	struct mlme_ext_priv	*pmlmeext = &padapter->mlmeextpriv;
+	struct vht_priv	*pvhtpriv_ap = &pmlmepriv->vhtpriv;
+	struct vht_priv	*pvhtpriv_sta = &psta->vhtpriv;
+	u8	cur_ldpc_cap = 0, cur_stbc_cap = 0, bw_mode = 0;
+	u8	*pcap_mcs;
+
+	if (pvhtpriv_sta->vht_option == _FALSE)
+		return;
+
+	bw_mode = GET_VHT_OPERATING_MODE_FIELD_CHNL_WIDTH(&pvhtpriv_sta->vht_op_mode_notify);
+
+	/* if (bw_mode > psta->cmn.bw_mode) */
+	psta->cmn.bw_mode = bw_mode;
+	psta->cmn.ra_info.is_vht_enable = _TRUE;
+
+	/* B4 Rx LDPC */
+	if (TEST_FLAG(pvhtpriv_ap->ldpc_cap, LDPC_VHT_ENABLE_TX) &&
+	    GET_VHT_CAPABILITY_ELE_RX_LDPC(pvhtpriv_sta->vht_cap)) {
+		SET_FLAG(cur_ldpc_cap, (LDPC_VHT_ENABLE_TX | LDPC_VHT_CAP_TX));
+		RTW_INFO("Current STA(%d) VHT LDPC = %02X\n", psta->cmn.aid, cur_ldpc_cap);
+	}
+	pvhtpriv_sta->ldpc_cap = cur_ldpc_cap;
+
+	if (psta->cmn.bw_mode > pmlmeext->cur_bwmode)
+		psta->cmn.bw_mode = pmlmeext->cur_bwmode;
+
+	if (psta->cmn.bw_mode == CHANNEL_WIDTH_80) {
+		/* B5 Short GI for 80 MHz */
+		pvhtpriv_sta->sgi_80m = (GET_VHT_CAPABILITY_ELE_SHORT_GI80M(pvhtpriv_sta->vht_cap) & pvhtpriv_ap->sgi_80m) ? _TRUE : _FALSE;
+		/* RTW_INFO("Current STA ShortGI80MHz = %d\n", pvhtpriv_sta->sgi_80m); */
+	} else if (psta->cmn.bw_mode >= CHANNEL_WIDTH_160) {
+		/* B5 Short GI for 80 MHz */
+		pvhtpriv_sta->sgi_80m = (GET_VHT_CAPABILITY_ELE_SHORT_GI160M(pvhtpriv_sta->vht_cap) & pvhtpriv_ap->sgi_80m) ? _TRUE : _FALSE;
+		/* RTW_INFO("Current STA ShortGI160MHz = %d\n", pvhtpriv_sta->sgi_80m); */
+	}
+
+	/* B8 B9 B10 Rx STBC */
+	if (TEST_FLAG(pvhtpriv_ap->stbc_cap, STBC_VHT_ENABLE_TX) &&
+	    GET_VHT_CAPABILITY_ELE_RX_STBC(pvhtpriv_sta->vht_cap)) {
+		SET_FLAG(cur_stbc_cap, (STBC_VHT_ENABLE_TX | STBC_VHT_CAP_TX));
+		RTW_INFO("Current STA(%d) VHT STBC = %02X\n", psta->cmn.aid, cur_stbc_cap);
+	}
+	pvhtpriv_sta->stbc_cap = cur_stbc_cap;
+
+#ifdef CONFIG_BEAMFORMING
+	update_sta_vht_info_apmode_bf_cap(padapter, psta);
 #endif
 
 	/* B23 B24 B25 Maximum A-MPDU Length Exponent */
@@ -501,12 +510,12 @@ void rtw_process_vht_op_mode_notify(_adapter *padapter, u8 *pframe, PVOID sta)
 	target_bw = GET_VHT_OPERATING_MODE_FIELD_CHNL_WIDTH(pframe);
 	target_rxss = (GET_VHT_OPERATING_MODE_FIELD_RX_NSS(pframe) + 1);
 
-	if (target_bw != psta->bw_mode) {
+	if (target_bw != psta->cmn.bw_mode) {
 		if (hal_is_bw_support(padapter, target_bw)
 		    && REGSTY_IS_BW_5G_SUPPORT(regsty, target_bw)
 		   ) {
 			update_ra = _TRUE;
-			psta->bw_mode = target_bw;
+			psta->cmn.bw_mode = target_bw;
 		}
 	}
 
@@ -519,7 +528,7 @@ void rtw_process_vht_op_mode_notify(_adapter *padapter, u8 *pframe, PVOID sta)
 		rtw_vht_nss_to_mcsmap(target_rxss, vht_mcs_map, psta->vhtpriv.vht_mcs_map);
 		_rtw_memcpy(psta->vhtpriv.vht_mcs_map, vht_mcs_map, 2);
 
-		rtw_hal_update_sta_rate_mask(padapter, psta);
+		rtw_hal_update_sta_ra_info(padapter, psta);
 	}
 
 	if (update_ra)
@@ -596,6 +605,8 @@ u32	rtw_build_vht_cap_ie(_adapter *padapter, u8 *pbuf)
 	struct registry_priv *pregistrypriv = &padapter->registrypriv;
 	struct mlme_priv	*pmlmepriv = &padapter->mlmepriv;
 	struct vht_priv	*pvhtpriv = &pmlmepriv->vhtpriv;
+	struct mlme_ext_priv	*pmlmeext = &padapter->mlmeextpriv;
+	struct mlme_ext_info	*pmlmeinfo = &(pmlmeext->mlmext_info);
 
 	pcap = pvhtpriv->vht_cap;
 	_rtw_memset(pcap, 0, 32);
@@ -654,7 +665,7 @@ u32	rtw_build_vht_cap_ie(_adapter *padapter, u8 *pbuf)
 		SET_VHT_CAPABILITY_ELE_RX_STBC(pcap, rx_stbc_nss);
 		RTW_INFO("[VHT] Declare supporting RX STBC = %d\n", rx_stbc_nss);
 	}
-
+	#ifdef CONFIG_BEAMFORMING
 	/* B11 SU Beamformer Capable */
 	if (TEST_FLAG(pvhtpriv->beamform_cap, BEAMFORMING_VHT_BEAMFORMER_ENABLE)) {
 		SET_VHT_CAPABILITY_ELE_SU_BFER(pcap, 1);
@@ -673,15 +684,23 @@ u32	rtw_build_vht_cap_ie(_adapter *padapter, u8 *pbuf)
 	if (TEST_FLAG(pvhtpriv->beamform_cap, BEAMFORMING_VHT_BEAMFORMEE_ENABLE)) {
 		SET_VHT_CAPABILITY_ELE_SU_BFEE(pcap, 1);
 		RTW_INFO("[VHT] Declare supporting SU Bfee\n");
-		/* B13 14 15 Compressed Steering Number of Beamformer Antennas Supported */
+
 		rtw_hal_get_def_var(padapter, HAL_DEF_BEAMFORMEE_CAP, (u8 *)&rf_num);
+
+		/* IOT action suggested by Yu Chen 2017/3/3 */
+		if ((pmlmeinfo->assoc_AP_vendor == HT_IOT_PEER_BROADCOM) &&
+			!GET_VHT_CAPABILITY_ELE_MU_BFER(&pvhtpriv->beamform_cap))
+			rf_num = (rf_num >= 2 ? 2 : rf_num);
+
+		/* B13 14 15 Compressed Steering Number of Beamformer Antennas Supported */
 		SET_VHT_CAPABILITY_ELE_BFER_ANT_SUPP(pcap, rf_num);
-		/* B20 SU Beamformee Capable */
+		/* B20 MU Beamformee Capable */
 		if (TEST_FLAG(pvhtpriv->beamform_cap, BEAMFORMING_VHT_MU_MIMO_STA_ENABLE)) {
 			SET_VHT_CAPABILITY_ELE_MU_BFEE(pcap, 1);
 			RTW_INFO("[VHT] Declare supporting MU Bfee\n");
 		}
 	}
+	#endif/*CONFIG_BEAMFORMING*/
 
 	/* B21 VHT TXOP PS */
 	SET_VHT_CAPABILITY_ELE_TXOP_PS(pcap, 0);
@@ -798,6 +817,50 @@ void VHTOnAssocRsp(_adapter *padapter)
 		rtw_hal_set_hwreg(padapter, HW_VAR_AMPDU_FACTOR, (u8 *)(&pvhtpriv->ampdu_len));
 
 	rtw_hal_set_hwreg(padapter, HW_VAR_AMPDU_MAX_TIME, (u8 *)(&pvhtpriv->vht_highest_rate));
+}
+
+void rtw_vht_ies_attach(_adapter *padapter, WLAN_BSSID_EX *pnetwork)
+{
+	struct mlme_priv *pmlmepriv = &(padapter->mlmepriv);
+	u8 cap_len, operation_len;
+	uint len = 0;
+	sint ie_len = 0;
+	u8 *p = NULL;
+
+	p = rtw_get_ie(pnetwork->IEs + _BEACON_IE_OFFSET_, EID_VHTCapability, &ie_len,
+			(pnetwork->IELength - _BEACON_IE_OFFSET_));
+	if (p && ie_len > 0)
+		return;
+
+	rtw_vht_use_default_setting(padapter);
+
+	/* VHT Operation mode notifiy bit in Extended IE (127) */
+	SET_EXT_CAPABILITY_ELE_OP_MODE_NOTIF(pmlmepriv->ext_capab_ie_data, 1);
+	pmlmepriv->ext_capab_ie_len = 10;
+	rtw_set_ie(pnetwork->IEs + pnetwork->IELength, EID_EXTCapability, 8, pmlmepriv->ext_capab_ie_data, &len);
+	pnetwork->IELength += pmlmepriv->ext_capab_ie_len;
+
+	/* VHT Capabilities element */
+	cap_len = rtw_build_vht_cap_ie(padapter, pnetwork->IEs + pnetwork->IELength);
+	pnetwork->IELength += cap_len;
+
+	/* VHT Operation element */
+	operation_len = rtw_build_vht_operation_ie(padapter, pnetwork->IEs + pnetwork->IELength,
+										pnetwork->Configuration.DSConfig);
+	pnetwork->IELength += operation_len;
+
+	pmlmepriv->vhtpriv.vht_option = _TRUE;
+}
+
+void rtw_vht_ies_detach(_adapter *padapter, WLAN_BSSID_EX *pnetwork)
+{
+	struct mlme_priv *pmlmepriv = &(padapter->mlmepriv);
+
+	rtw_remove_bcn_ie(padapter, pnetwork, EID_EXTCapability);
+	rtw_remove_bcn_ie(padapter, pnetwork, EID_VHTCapability);
+	rtw_remove_bcn_ie(padapter, pnetwork, EID_VHTOperation);
+
+	pmlmepriv->vhtpriv.vht_option = _FALSE;
 }
 
 #endif /* CONFIG_80211AC_VHT */

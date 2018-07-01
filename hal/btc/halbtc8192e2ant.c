@@ -1,3 +1,17 @@
+/******************************************************************************
+ *
+ * Copyright(c) 2016 - 2017 Realtek Corporation.
+ *
+ * This program is free software; you can redistribute it and/or modify it
+ * under the terms of version 2 of the GNU General Public License as
+ * published by the Free Software Foundation.
+ *
+ * This program is distributed in the hope that it will be useful, but WITHOUT
+ * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
+ * FITNESS FOR A PARTICULAR PURPOSE. See the GNU General Public License for
+ * more details.
+ *
+ *****************************************************************************/
 /* ************************************************************
  * Description:
  *
@@ -42,10 +56,12 @@ const char *const glbt_info_src_8192e_2ant[] = {
  * Please strictly follow this order and naming style !!!
  *
  * ************************************************************ */
-u32	glcoex_ver_date_8192e_2ant = 20161024;
-u32	glcoex_ver_8192e_2ant = 0x45;
-u32	glcoex_ver_btdesired_8192e_2ant = 0x03;
-/*1.BT FW update BLE channel map with high priority*/
+u32	glcoex_ver_date_8192e_2ant = 20170113;
+u32	glcoex_ver_8192e_2ant = 0x46;
+u32	glcoex_ver_btdesired_8192e_2ant = 0x04;
+/*1.fix miracast issue*/
+/*2.update BT FW for power on latch issue*/
+/*3. move the function of polling BT version to ex_halbtc8192e2ant_display_coex_info*/
 /* ************************************************************
  * local function proto type if needed
  * ************************************************************
@@ -177,59 +193,6 @@ u8 halbtc8192e2ant_wifi_rssi_state(IN struct btc_coexist *btcoexist,
 	coex_sta->pre_wifi_rssi_state[index] = wifi_rssi_state;
 
 	return wifi_rssi_state;
-}
-
-void halbtc8192e2ant_monitor_bt_enable_disable(IN struct btc_coexist *btcoexist)
-{
-	static u32	bt_disable_cnt = 0;
-	boolean			bt_active = true, bt_disabled = false;
-
-	/* This function check if bt is disabled */
-
-	if (coex_sta->high_priority_tx == 0 &&
-	    coex_sta->high_priority_rx == 0 &&
-	    coex_sta->low_priority_tx == 0 &&
-	    coex_sta->low_priority_rx == 0)
-		bt_active = false;
-	if (coex_sta->high_priority_tx == 0xffff &&
-	    coex_sta->high_priority_rx == 0xffff &&
-	    coex_sta->low_priority_tx == 0xffff &&
-	    coex_sta->low_priority_rx == 0xffff)
-		bt_active = false;
-	if (bt_active) {
-		bt_disable_cnt = 0;
-		bt_disabled = false;
-		btcoexist->btc_set(btcoexist, BTC_SET_BL_BT_DISABLE,
-				   &bt_disabled);
-		BTC_SPRINTF(trace_buf, BT_TMP_BUF_SIZE,
-			    "[BTCoex], BT is enabled !!\n");
-		BTC_TRACE(trace_buf);
-	} else {
-		bt_disable_cnt++;
-		BTC_SPRINTF(trace_buf, BT_TMP_BUF_SIZE,
-			    "[BTCoex], bt all counters=0, %d times!!\n",
-			    bt_disable_cnt);
-		BTC_TRACE(trace_buf);
-		if (bt_disable_cnt >= 2) {
-			bt_disabled = true;
-			btcoexist->btc_set(btcoexist, BTC_SET_BL_BT_DISABLE,
-					   &bt_disabled);
-			BTC_SPRINTF(trace_buf, BT_TMP_BUF_SIZE,
-				    "[BTCoex], BT is disabled !!\n");
-			BTC_TRACE(trace_buf);
-		}
-	}
-	if (coex_sta->bt_disabled != bt_disabled) {
-		BTC_SPRINTF(trace_buf, BT_TMP_BUF_SIZE,
-			    "[BTCoex], BT is from %s to %s!!\n",
-			    (coex_sta->bt_disabled ? "disabled" : "enabled"),
-			    (bt_disabled ? "disabled" : "enabled"));
-		BTC_TRACE(trace_buf);
-		coex_sta->bt_disabled = bt_disabled;
-		/* if (!bt_disabled) {
-		} else {
-		} */
-	}
 }
 
 u32 halbtc8192e2ant_decide_ra_mask(IN struct btc_coexist *btcoexist,
@@ -1294,16 +1257,12 @@ void halbtc8192e2ant_set_fw_pstdma(IN struct btc_coexist *btcoexist,
 	btcoexist->btc_get(btcoexist, BTC_GET_BL_WIFI_AP_MODE_ENABLE,
 			   &ap_enable);
 
-	if (ap_enable) {
-		if (byte1 & BIT(4) && !(byte1 & BIT(5))) {
-			BTC_SPRINTF(trace_buf, BT_TMP_BUF_SIZE,
-				    "[BTCoex], FW for 1Ant AP mode\n");
-			real_byte1 &= ~BIT(4);
-			real_byte1 |= BIT(5);
+	if ((ap_enable) && (byte1 & BIT(4) && !(byte1 & BIT(5)))) {
+		real_byte1 &= ~BIT(4);
+		real_byte1 |= BIT(5);
 
-			real_byte5 |= BIT(5);
-			real_byte5 &= ~BIT(6);
-		}
+		real_byte5 |= BIT(5);
+		real_byte5 &= ~BIT(6);
 	} else if ((byte1 & BIT(4)) && (!(byte1 & BIT(5))))
 		halbtc8192e2ant_power_save_state(btcoexist, BTC_PS_LPS_ON, 0x50, 0x4);
 	else
@@ -1631,6 +1590,61 @@ void halbtc8192e2ant_ps_tdma(IN struct btc_coexist *btcoexist,
 }
 
 
+void halbtc8192e2ant_monitor_bt_enable_disable(IN struct btc_coexist *btcoexist)
+{
+	static u32	bt_disable_cnt = 0;
+	boolean			bt_active = true, bt_disabled = false;
+
+	/* This function check if bt is disabled */
+
+	if (coex_sta->high_priority_tx == 0 &&
+	    coex_sta->high_priority_rx == 0 &&
+	    coex_sta->low_priority_tx == 0 &&
+	    coex_sta->low_priority_rx == 0)
+		bt_active = false;
+	if (coex_sta->high_priority_tx == 0xffff &&
+	    coex_sta->high_priority_rx == 0xffff &&
+	    coex_sta->low_priority_tx == 0xffff &&
+	    coex_sta->low_priority_rx == 0xffff)
+		bt_active = false;
+	if (bt_active) {
+		bt_disable_cnt = 0;
+		bt_disabled = false;
+		btcoexist->btc_set(btcoexist, BTC_SET_BL_BT_DISABLE,
+				   &bt_disabled);
+		BTC_SPRINTF(trace_buf, BT_TMP_BUF_SIZE,
+			    "[BTCoex], BT is enabled !!\n");
+		BTC_TRACE(trace_buf);
+	} else {
+		bt_disable_cnt++;
+		BTC_SPRINTF(trace_buf, BT_TMP_BUF_SIZE,
+			    "[BTCoex], bt all counters=0, %d times!!\n",
+			    bt_disable_cnt);
+		BTC_TRACE(trace_buf);
+		if (bt_disable_cnt >= 2) {
+			bt_disabled = true;
+			btcoexist->btc_set(btcoexist, BTC_SET_BL_BT_DISABLE,
+					   &bt_disabled);
+			BTC_SPRINTF(trace_buf, BT_TMP_BUF_SIZE,
+				    "[BTCoex], BT is disabled !!\n");
+			BTC_TRACE(trace_buf);
+		}
+	}
+	if (coex_sta->bt_disabled != bt_disabled) {
+		BTC_SPRINTF(trace_buf, BT_TMP_BUF_SIZE,
+			    "[BTCoex], BT is from %s to %s!!\n",
+			    (coex_sta->bt_disabled ? "disabled" : "enabled"),
+			    (bt_disabled ? "disabled" : "enabled"));
+		BTC_TRACE(trace_buf);
+		coex_sta->bt_disabled = bt_disabled;
+		if (bt_disabled) {
+			halbtc8192e2ant_ps_tdma(btcoexist, FORCE_EXEC, false, 0);
+			halbtc8192e2ant_coex_table_with_type(btcoexist, NORMAL_EXEC, 0);
+		}
+	}
+}
+
+
 void halbtc8192e2ant_coex_all_off(IN struct btc_coexist *btcoexist)
 {
 	/* fw all off */
@@ -1719,7 +1733,7 @@ boolean halbtc8192e2ant_is_common_action(IN struct btc_coexist *btcoexist)
 		common = true;
 	} else {
 		if (coex_dm->bt_status == BT_8192E_2ANT_BT_STATUS_NON_CONNECTED_IDLE) {
-			if (wifi_busy) {
+			if (wifi_busy && (coex_sta->high_priority_rx > 10))  {
 				BTC_SPRINTF(trace_buf, BT_TMP_BUF_SIZE, "[BTCoex], Wifi busy + BT non connected-idle!!\n");
 				BTC_TRACE(trace_buf);
 
@@ -3632,19 +3646,32 @@ void ex_halbtc8192e2ant_display_coex_info(IN struct btc_coexist *btcoexist)
 		   board_info->ant_type);
 	CL_PRINTF(cli_buf);
 
+	if (!coex_sta->bt_disabled) {
+		if ((coex_sta->bt_coex_supported_version == 0) ||
+			(coex_sta->bt_coex_supported_version == 0xffff))
+			btcoexist->btc_get(btcoexist, BTC_GET_U4_SUPPORTED_VERSION,
+						&coex_sta->bt_coex_supported_version);
+
+		btcoexist->btc_get(btcoexist, BTC_GET_U4_BT_PATCH_VER,
+						&bt_patch_ver);
+		btcoexist->bt_info.bt_get_fw_ver = bt_patch_ver;
+	}
+
 	btcoexist->btc_get(btcoexist, BTC_GET_U4_BT_PATCH_VER, &bt_patch_ver);
 	btcoexist->btc_get(btcoexist, BTC_GET_U4_WIFI_FW_VER, &fw_ver);
 	phyver = btcoexist->btc_get_bt_phydm_version(btcoexist);
-	bt_coex_ver = ((coex_sta->bt_coex_supported_version & 0xff00) >> 8);
+	bt_coex_ver = coex_sta->bt_coex_supported_version & 0xff;
 
 	CL_SPRINTF(cli_buf, BT_TMP_BUF_SIZE,
 		   "\r\n %-35s = %d_%02x/ 0x%02x/ 0x%02x (%s)",
 		   "CoexVer WL/  BT_Desired/ BT_Report",
 		   glcoex_ver_date_8192e_2ant, glcoex_ver_8192e_2ant,
-		   glcoex_ver_btdesired_8192e_2ant, bt_coex_ver,
-		   (bt_coex_ver == 0xff ? "Unknown" : (bt_coex_ver >=
-				   glcoex_ver_btdesired_8192e_2ant ? "Match" :
-				   "Mis-Match")));
+		   glcoex_ver_btdesired_8192e_2ant,
+		   bt_coex_ver,
+		   (bt_coex_ver == 0xff ? "Unknown" :
+		    (coex_sta->bt_disabled ? "BT-disable" :
+		     (bt_coex_ver >= glcoex_ver_btdesired_8192e_2ant ?
+		      "Match" : "Mis-Match"))));
 	CL_PRINTF(cli_buf);
 
 
@@ -3887,6 +3914,7 @@ void ex_halbtc8192e2ant_ips_notify(IN struct btc_coexist *btcoexist, IN u8 type)
 		halbtc8192e2ant_coex_all_off(btcoexist);
 		halbtc8192e2ant_set_ant_path(btcoexist, BTC_ANT_PATH_BT, false, true);
 		halbtc8192e2ant_ignore_wlan_act(btcoexist, FORCE_EXEC, true);
+		ex_halbtc8192e2ant_media_status_notify(btcoexist, BTC_MEDIA_DISCONNECT);
 	} else if (BTC_IPS_LEAVE == type) {
 		BTC_SPRINTF(trace_buf, BT_TMP_BUF_SIZE,
 			    "[BTCoex], IPS LEAVE notify\n");
@@ -4205,12 +4233,6 @@ void ex_halbtc8192e2ant_periodical(IN struct btc_coexist *btcoexist)
 	static u8			count = 0;
 	static boolean		pre_wifi_connected = false;
 
-	if ((coex_sta->bt_coex_supported_version == 0) ||
-	    (coex_sta->bt_coex_supported_version == 0xffff))
-		coex_sta->bt_coex_supported_version =
-			btcoexist->btc_get_bt_coex_supported_version(btcoexist);
-
-
 /*If wifi is connecting, the update of wifi channel mask may fail caused by wifi FW*/
 	btcoexist->btc_get(btcoexist, BTC_GET_BL_WIFI_CONNECTED, &wifi_connected);
 
@@ -4229,7 +4251,6 @@ void ex_halbtc8192e2ant_periodical(IN struct btc_coexist *btcoexist)
 
 	pre_wifi_connected = wifi_connected;
 /*If wifi is connecting, the update of wifi channel mask may fail caused by wifi FW*/
-
 
 #if (BT_AUTO_REPORT_ONLY_8192E_2ANT == 0)
 	halbtc8192e2ant_query_bt_info(btcoexist);

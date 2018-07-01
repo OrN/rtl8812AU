@@ -1,6 +1,6 @@
 /******************************************************************************
  *
- * Copyright(c) 2007 - 2011 Realtek Corporation. All rights reserved.
+ * Copyright(c) 2007 - 2017 Realtek Corporation.
  *
  * This program is free software; you can redistribute it and/or modify it
  * under the terms of version 2 of the GNU General Public License as
@@ -11,12 +11,7 @@
  * FITNESS FOR A PARTICULAR PURPOSE. See the GNU General Public License for
  * more details.
  *
- * You should have received a copy of the GNU General Public License along with
- * this program; if not, write to the Free Software Foundation, Inc.,
- * 51 Franklin Street, Fifth Floor, Boston, MA 02110, USA
- *
- *
- ******************************************************************************/
+ *****************************************************************************/
 #define _RTW_EFUSE_C_
 
 #include <drv_types.h>
@@ -415,31 +410,39 @@ u16 rtw_get_efuse_mask_arraylen(PADAPTER pAdapter)
 	return 0;
 }
 
+static void rtw_mask_map_read(PADAPTER padapter, u16 addr, u16 cnts, u8 *data)
+{
+	u16 i = 0;
+
+	if (padapter->registrypriv.boffefusemask == 0) {
+
+			for (i = 0; i < cnts; i++) {
+				if (padapter->registrypriv.bFileMaskEfuse == _TRUE) {
+					if (rtw_file_efuse_IsMasked(padapter, addr + i)) /*use file efuse mask.*/
+						data[i] = 0xff;
+				} else {
+					/*RTW_INFO(" %s , data[%d] = %x\n", __func__, i, data[i]);*/
+					if (efuse_IsMasked(padapter, addr + i)) {
+						data[i] = 0xff;
+						/*RTW_INFO(" %s ,mask data[%d] = %x\n", __func__, i, data[i]);*/
+					}
+				}
+			}
+
+	}
+}
+
 u8 rtw_efuse_mask_map_read(PADAPTER padapter, u16 addr, u16 cnts, u8 *data)
 {
 	u8	ret = _SUCCESS;
-	u16	mapLen = 0, i = 0;
+	u16	mapLen = 0;
 
 	EFUSE_GetEfuseDefinition(padapter, EFUSE_WIFI, TYPE_EFUSE_MAP_LEN, (PVOID)&mapLen, _FALSE);
 
 	ret = rtw_efuse_map_read(padapter, addr, cnts , data);
 
-	if (padapter->registrypriv.boffefusemask == 0) {
+	rtw_mask_map_read(padapter, addr, cnts , data);
 
-		for (i = 0; i < cnts; i++) {
-			if (padapter->registrypriv.bFileMaskEfuse == _TRUE) {
-				if (rtw_file_efuse_IsMasked(padapter, addr + i)) /*use file efuse mask.*/
-					data[i] = 0xff;
-			} else {
-				/*RTW_INFO(" %s , data[%d] = %x\n", __func__, i, data[i]);*/
-				if (efuse_IsMasked(padapter, addr + i)) {
-					data[i] = 0xff;
-					/*RTW_INFO(" %s ,mask data[%d] = %x\n", __func__, i, data[i]);*/
-				}
-			}
-		}
-
-	}
 	return ret;
 
 }
@@ -720,6 +723,51 @@ void rtw_efuse_analyze(PADAPTER	padapter, u8 Type, u8 Fake)
 		rtw_mfree((u8 *)eFuseWord, EFUSE_MAX_SECTION_NUM * (EFUSE_MAX_WORD_UNIT * 2));
 }
 
+VOID efuse_PreUpdateAction(
+	PADAPTER	pAdapter,
+	pu4Byte	BackupRegs)
+{
+	if (IS_HARDWARE_TYPE_8812AU(pAdapter) || IS_HARDWARE_TYPE_8822BU(pAdapter)) {
+		/* <20131115, Kordan> Turn off Rx to prevent from being busy when writing the EFUSE. (Asked by Chunchu.)*/
+		BackupRegs[0] = phy_query_mac_reg(pAdapter, REG_RCR, bMaskDWord);
+		BackupRegs[1] = phy_query_mac_reg(pAdapter, REG_RXFLTMAP0, bMaskDWord);
+		BackupRegs[2] = phy_query_mac_reg(pAdapter, REG_RXFLTMAP0+4, bMaskDWord);
+#ifdef CONFIG_RTL8812A
+		BackupRegs[3] = phy_query_mac_reg(pAdapter, REG_AFE_MISC, bMaskDWord);
+#endif
+		PlatformEFIOWrite4Byte(pAdapter, REG_RCR, 0x1);
+		PlatformEFIOWrite1Byte(pAdapter, REG_RXFLTMAP0, 0);
+		PlatformEFIOWrite1Byte(pAdapter, REG_RXFLTMAP0+1, 0);
+		PlatformEFIOWrite1Byte(pAdapter, REG_RXFLTMAP0+2, 0);
+		PlatformEFIOWrite1Byte(pAdapter, REG_RXFLTMAP0+3, 0);
+		PlatformEFIOWrite1Byte(pAdapter, REG_RXFLTMAP0+4, 0);
+		PlatformEFIOWrite1Byte(pAdapter, REG_RXFLTMAP0+5, 0);
+#ifdef CONFIG_RTL8812A
+		/* <20140410, Kordan> 0x11 = 0x4E, lower down LX_SPS0 voltage. (Asked by Chunchu)*/
+		phy_set_mac_reg(pAdapter, REG_AFE_MISC, bMaskByte1, 0x4E);
+#endif
+		RTW_INFO(" %s , done\n", __func__);
+
+		}
+}
+
+
+VOID efuse_PostUpdateAction(
+	PADAPTER	pAdapter,
+	pu4Byte	BackupRegs)
+{
+	if (IS_HARDWARE_TYPE_8812AU(pAdapter) || IS_HARDWARE_TYPE_8822BU(pAdapter)) {
+		/* <20131115, Kordan> Turn on Rx and restore the registers. (Asked by Chunchu.)*/
+		phy_set_mac_reg(pAdapter, REG_RCR, bMaskDWord, BackupRegs[0]);
+		phy_set_mac_reg(pAdapter, REG_RXFLTMAP0, bMaskDWord, BackupRegs[1]);
+		phy_set_mac_reg(pAdapter, REG_RXFLTMAP0+4, bMaskDWord, BackupRegs[2]);
+#ifdef CONFIG_RTL8812A
+		phy_set_mac_reg(pAdapter, REG_AFE_MISC, bMaskDWord, BackupRegs[3]);
+#endif
+	RTW_INFO(" %s , done\n", __func__);
+	}
+}
+
 
 #ifdef RTW_HALMAC
 #include "../../hal/hal_halmac.h"
@@ -942,40 +990,52 @@ u8 rtw_efuse_map_read(PADAPTER adapter, u16 addr, u16 cnts, u8 *data)
 	u8 *efuse = NULL;
 	u32 size, i;
 	int err;
+	u32	backupRegs[4] = {0};
+	u8 status = _SUCCESS;
 
+	efuse_PreUpdateAction(adapter, backupRegs);
 
 	d = adapter_to_dvobj(adapter);
 	err = rtw_halmac_get_logical_efuse_size(d, &size);
-	if (err)
-		return _FAIL;
-
+	if (err) {
+		status = _FAIL;
+		goto exit;
+	}
 	/* size error handle */
 	if ((addr + cnts) > size) {
 		if (addr < size)
 			cnts = size - addr;
-		else
-			return _FAIL;
+		else {
+			status = _FAIL;
+			goto exit;
+		}
 	}
 
 	if (cnts > 16)
 		efuse = rtw_zmalloc(size);
 
 	if (efuse) {
-		err = rtw_halmac_read_logical_efuse_map(d, efuse, size);
+		err = rtw_halmac_read_logical_efuse_map(d, efuse, size, NULL, 0);
 		if (err) {
 			rtw_mfree(efuse, size);
-			return _FAIL;
+			status = _FAIL;
+			goto exit;
 		}
 
 		_rtw_memcpy(data, efuse + addr, cnts);
 		rtw_mfree(efuse, size);
 	} else {
 		err = rtw_halmac_read_logical_efuse(d, addr, cnts, data);
-		if (err)
-			return _FAIL;
+		if (err) {
+			status = _FAIL;
+			goto exit;
+		}
 	}
+	status = _SUCCESS;
+exit:
+	efuse_PostUpdateAction(adapter, backupRegs);
 
-	return _SUCCESS;
+	return status;
 }
 
 u8 rtw_efuse_map_write(PADAPTER adapter, u16 addr, u16 cnts, u8 *data)
@@ -986,23 +1046,34 @@ u8 rtw_efuse_map_write(PADAPTER adapter, u16 addr, u16 cnts, u8 *data)
 	int err;
 	u8 mask_buf[64] = "";
 	u16 mask_len = sizeof(u8) * rtw_get_efuse_mask_arraylen(adapter);
+	u32 backupRegs[4] = {0};
+	u8 status = _SUCCESS;;
+
+	efuse_PreUpdateAction(adapter, backupRegs);
 
 	d = adapter_to_dvobj(adapter);
 	err = rtw_halmac_get_logical_efuse_size(d, &size);
-	if (err)
-		return _FAIL;
+	if (err) {
+		status = _FAIL;
+		goto exit;
+	}
 
-	if ((addr + cnts) > size)
-		return _FAIL;
+	if ((addr + cnts) > size) {
+		status = _FAIL;
+		goto exit;
+	}
 
 	efuse = rtw_zmalloc(size);
-	if (!efuse)
-		return _FAIL;
+	if (!efuse) {
+		status = _FAIL;
+		goto exit;
+	}
 
-	err = rtw_halmac_read_logical_efuse_map(d, efuse, size);
+	err = rtw_halmac_read_logical_efuse_map(d, efuse, size, NULL, 0);
 	if (err) {
 		rtw_mfree(efuse, size);
-		return _FAIL;
+		status = _FAIL;
+		goto exit;
 	}
 
 	_rtw_memcpy(efuse + addr, data, cnts);
@@ -1027,12 +1098,16 @@ u8 rtw_efuse_map_write(PADAPTER adapter, u16 addr, u16 cnts, u8 *data)
 
 	if (err) {
 		rtw_mfree(efuse, size);
-		return _FAIL;
+		status = _FAIL;
+		goto exit;
 	}
 
 	rtw_mfree(efuse, size);
+	status = _SUCCESS;
+exit :
+	efuse_PostUpdateAction(adapter, backupRegs);
 
-	return _SUCCESS;
+	return status;
 }
 
 int Efuse_PgPacketRead(PADAPTER adapter, u8 offset, u8 *data, BOOLEAN test)
@@ -1716,47 +1791,6 @@ u8 EfusePgPacketWrite_BT(
 #define EFUSE_CTRL			REG_EFUSE_CTRL		/* E-Fuse Control. */
 /* ------------------------------------------------------------------------------ */
 
-VOID efuse_PreUpdateAction(
-	PADAPTER	pAdapter,
-	pu4Byte	BackupRegs)
-{
-#if defined(CONFIG_RTL8812A)
-	if (IS_HARDWARE_TYPE_8812AU(pAdapter)) {
-		/* <20131115, Kordan> Turn off Rx to prevent from being busy when writing the EFUSE. (Asked by Chunchu.)*/
-		BackupRegs[0] = phy_query_mac_reg(pAdapter, REG_RCR, bMaskDWord);
-		BackupRegs[1] = phy_query_mac_reg(pAdapter, REG_RXFLTMAP0, bMaskDWord);
-		BackupRegs[2] = phy_query_mac_reg(pAdapter, REG_RXFLTMAP0+4, bMaskDWord);
-		BackupRegs[3] = phy_query_mac_reg(pAdapter, REG_AFE_MISC, bMaskDWord);
-
-		PlatformEFIOWrite4Byte(pAdapter, REG_RCR, 0x1);
-		PlatformEFIOWrite1Byte(pAdapter, REG_RXFLTMAP0, 0);
-		PlatformEFIOWrite1Byte(pAdapter, REG_RXFLTMAP0+1, 0);
-		PlatformEFIOWrite1Byte(pAdapter, REG_RXFLTMAP0+2, 0);
-		PlatformEFIOWrite1Byte(pAdapter, REG_RXFLTMAP0+3, 0);
-		PlatformEFIOWrite1Byte(pAdapter, REG_RXFLTMAP0+4, 0);
-		PlatformEFIOWrite1Byte(pAdapter, REG_RXFLTMAP0+5, 0);
-
-		/* <20140410, Kordan> 0x11 = 0x4E, lower down LX_SPS0 voltage. (Asked by Chunchu)*/
-		phy_set_mac_reg(pAdapter, REG_AFE_MISC, bMaskByte1, 0x4E);
-		}
-#endif
-}
-
-VOID efuse_PostUpdateAction(
-	PADAPTER	pAdapter,
-	pu4Byte	BackupRegs)
-{
-#if defined(CONFIG_RTL8812A)
-	if (IS_HARDWARE_TYPE_8812AU(pAdapter)) {
-		/* <20131115, Kordan> Turn on Rx and restore the registers. (Asked by Chunchu.)*/
-		phy_set_mac_reg(pAdapter, REG_RCR, bMaskDWord, BackupRegs[0]);
-		phy_set_mac_reg(pAdapter, REG_RXFLTMAP0, bMaskDWord, BackupRegs[1]);
-		phy_set_mac_reg(pAdapter, REG_RXFLTMAP0+4, bMaskDWord, BackupRegs[2]);
-		phy_set_mac_reg(pAdapter, REG_AFE_MISC, bMaskDWord, BackupRegs[3]);
-	}
-#endif
-}
-
 
 BOOLEAN
 Efuse_Read1ByteFromFakeContent(
@@ -1886,7 +1920,7 @@ ReadEFuseByte(
 	u32	value32;
 	u8	readbyte;
 	u16	retry;
-	/* u32 start=rtw_get_current_time(); */
+	/* systime start=rtw_get_current_time(); */
 
 	if (bPseudoTest) {
 		Efuse_Read1ByteFromFakeContent(Adapter, _offset, pbuf);
@@ -2309,8 +2343,9 @@ u8 rtw_efuse_map_write(PADAPTER padapter, u16 addr, u16 cnts, u8 *data)
 		return _FAIL;	\
 	}
 
+	u8 *efuse = NULL;
 	u8	offset, word_en;
-	u8	*map;
+	u8	*map = NULL;
 	u8	newdata[PGPKT_DATA_SIZE];
 	s32	i, j, idx, chk_total_byte;
 	u8	ret = _SUCCESS;
@@ -2329,9 +2364,15 @@ u8 rtw_efuse_map_write(PADAPTER padapter, u16 addr, u16 cnts, u8 *data)
 	RT_ASSERT_RET(PGPKT_DATA_SIZE == 8); /* have to be 8 byte alignment */
 	RT_ASSERT_RET((mapLen & 0x7) == 0); /* have to be PGPKT_DATA_SIZE alignment for memcpy */
 
-	map = rtw_zmalloc(mapLen);
-	if (map == NULL)
+	efuse = rtw_zmalloc(mapLen);
+	if (!efuse)
 		return _FAIL;
+
+	map = rtw_zmalloc(mapLen);
+	if (map == NULL) {
+		rtw_mfree(efuse, mapLen);
+		return _FAIL;
+	}
 
 	_rtw_memset(map, 0xFF, mapLen);
 
@@ -2339,16 +2380,19 @@ u8 rtw_efuse_map_write(PADAPTER padapter, u16 addr, u16 cnts, u8 *data)
 	if (ret == _FAIL)
 		goto exit;
 
+	_rtw_memcpy(efuse , map, mapLen);
+	_rtw_memcpy(efuse + addr, data, cnts);
+
 	if (padapter->registrypriv.boffefusemask == 0) {
 		for (i = 0; i < cnts; i++) {
 			if (padapter->registrypriv.bFileMaskEfuse == _TRUE) {
 				if (rtw_file_efuse_IsMasked(padapter, addr + i))	/*use file efuse mask. */
-					data[i] = map[addr + i];
+					efuse[addr + i] = map[addr + i];
 			} else {
 				if (efuse_IsMasked(padapter, addr + i))
-					data[i] = map[addr + i];
+					efuse[addr + i] = map[addr + i];
 			}
-			RTW_INFO("%s , data[%d] = %x, map[addr+i]= %x\n", __func__, i, data[i], map[addr + i]);
+			RTW_INFO("%s , data[%d] = %x, map[addr+i]= %x\n", __func__, addr + i, efuse[ addr + i], map[addr + i]);
 		}
 	}
 	/*Efuse_PowerSwitch(padapter, _TRUE, _TRUE);*/
@@ -2361,7 +2405,7 @@ u8 rtw_efuse_map_write(PADAPTER padapter, u16 addr, u16 cnts, u8 *data)
 		word_en = 0xF;
 		j = (addr + idx) & 0x7;
 		for (i = j; i < PGPKT_DATA_SIZE && idx < cnts; i++, idx++) {
-			if (data[idx] != map[addr + idx])
+			if (efuse[addr + idx] != map[addr + idx])
 				word_en &= ~BIT(i >> 1);
 		}
 
@@ -2402,9 +2446,9 @@ u8 rtw_efuse_map_write(PADAPTER padapter, u16 addr, u16 cnts, u8 *data)
 		j = (addr + idx) & 0x7;
 		_rtw_memcpy(newdata, &map[offset << 3], PGPKT_DATA_SIZE);
 		for (i = j; i < PGPKT_DATA_SIZE && idx < cnts; i++, idx++) {
-			if (data[idx] != map[addr + idx]) {
+			if (efuse[addr + idx] != map[addr + idx]) {
 				word_en &= ~BIT(i >> 1);
-				newdata[i] = data[idx];
+				newdata[i] = efuse[addr + idx];
 #ifdef CONFIG_RTL8723B
 				if (addr + idx == 0x8) {
 					if (IS_C_CUT(pHalData->version_id) || IS_B_CUT(pHalData->version_id)) {
@@ -2439,6 +2483,7 @@ u8 rtw_efuse_map_write(PADAPTER padapter, u16 addr, u16 cnts, u8 *data)
 exit:
 
 	rtw_mfree(map, mapLen);
+	rtw_mfree(efuse, mapLen);
 
 	return ret;
 }
@@ -2888,7 +2933,7 @@ void EFUSE_ShadowMapUpdate(
 	}
 
 	if (pHalData->bautoload_fail_flag == _FALSE) {
-		err = rtw_halmac_read_logical_efuse_map(adapter_to_dvobj(pAdapter), efuse_map, mapLen);
+		err = rtw_halmac_read_logical_efuse_map(adapter_to_dvobj(pAdapter), efuse_map, mapLen, NULL, 0);
 		if (err)
 			RTW_ERR("%s: <ERROR> fail to get efuse map!\n", __FUNCTION__);
 	}
@@ -2913,6 +2958,8 @@ void EFUSE_ShadowMapUpdate(
 	/* PlatformMoveMemory((PVOID)&pHalData->EfuseMap[EFUSE_MODIFY_MAP][0], */
 	/* (PVOID)&pHalData->EfuseMap[EFUSE_INIT_MAP][0], mapLen); */
 #endif /* !RTW_HALMAC */
+
+	rtw_mask_map_read(pAdapter, 0x00, mapLen, pHalData->efuse_eeprom_data);
 
 	rtw_dump_cur_efuse(pAdapter);
 } /* EFUSE_ShadowMapUpdate */

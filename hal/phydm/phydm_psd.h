@@ -1,7 +1,7 @@
 /******************************************************************************
  *
- * Copyright(c) 2007 - 2011 Realtek Corporation. All rights reserved.
- *                                        
+ * Copyright(c) 2007 - 2017 Realtek Corporation.
+ *
  * This program is free software; you can redistribute it and/or modify it
  * under the terms of version 2 of the GNU General Public License as
  * published by the Free Software Foundation.
@@ -11,12 +11,7 @@
  * FITNESS FOR A PARTICULAR PURPOSE. See the GNU General Public License for
  * more details.
  *
- * You should have received a copy of the GNU General Public License along with
- * this program; if not, write to the Free Software Foundation, Inc.,
- * 51 Franklin Street, Fifth Floor, Boston, MA 02110, USA
- *
- *
- ******************************************************************************/
+ *****************************************************************************/
 
 #ifndef	__PHYDMPSD_H__
 #define    __PHYDMPSD_H__
@@ -24,11 +19,7 @@
 /*#define PSD_VERSION	"1.0"*/  /*2016.09.22  Dino*/
 #define PSD_VERSION	"1.1"  /*2016.10.07  Dino, Add Option for PSD Tone index Selection */
 
-#if (CONFIG_PSD_TOOL == 1)
-
-
-#define	STOP_TRX_SUCCESS	1
-#define	STOP_TRX_FAIL	0
+#ifdef CONFIG_PSD_TOOL
 
 
 struct _PHYDM_PSD_ {
@@ -41,6 +32,7 @@ struct _PHYDM_PSD_ {
 	u16	fft_smp_point;
 	u32	initial_gain_backup;
 	u32	rf_0x18_bkp;
+	u32	rf_0x18_bkp_b;
 	u16	psd_fc_channel;
 	u32	psd_bw_rf_reg;
 	u8	psd_result[128];

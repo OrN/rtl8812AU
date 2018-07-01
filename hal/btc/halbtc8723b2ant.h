@@ -1,3 +1,17 @@
+/******************************************************************************
+ *
+ * Copyright(c) 2016 - 2017 Realtek Corporation.
+ *
+ * This program is free software; you can redistribute it and/or modify it
+ * under the terms of version 2 of the GNU General Public License as
+ * published by the Free Software Foundation.
+ *
+ * This program is distributed in the hope that it will be useful, but WITHOUT
+ * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
+ * FITNESS FOR A PARTICULAR PURPOSE. See the GNU General Public License for
+ * more details.
+ *
+ *****************************************************************************/
 
 #if (BT_SUPPORT == 1 && COEX_SUPPORT == 1)
 
@@ -164,6 +178,8 @@ struct coex_sta_8723b_2ant {
 
 	u8					a2dp_bit_pool;
 	u8					cut_version;
+	u8					hid_busy_num;
+	u8					bt_info_ext2;
 };
 
 /* *******************************************

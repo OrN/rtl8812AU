@@ -1,6 +1,6 @@
 /******************************************************************************
  *
- * Copyright(c) 2007 - 2011 Realtek Corporation. All rights reserved.
+ * Copyright(c) 2007 - 2017 Realtek Corporation.
  *
  * This program is free software; you can redistribute it and/or modify it
  * under the terms of version 2 of the GNU General Public License as
@@ -11,12 +11,7 @@
  * FITNESS FOR A PARTICULAR PURPOSE. See the GNU General Public License for
  * more details.
  *
- * You should have received a copy of the GNU General Public License along with
- * this program; if not, write to the Free Software Foundation, Inc.,
- * 51 Franklin Street, Fifth Floor, Boston, MA 02110, USA
- *
- *
- ******************************************************************************/
+ *****************************************************************************/
 #ifndef __HAL_COMMON_REG_H__
 #define __HAL_COMMON_REG_H__
 
@@ -709,6 +704,7 @@ Default: 00b.
 **      REG_CCK_CHECK						(offset 0x454)
 ------------------------------------------------------------------------------*/
 #define BIT_BCN_PORT_SEL		BIT(5)
+#define BIT_EN_BCN_PKT_REL		BIT(6)
 
 #endif /* RTW_HALMAC */
 
@@ -1482,6 +1478,12 @@ Current IOREG MAP
 #define	RETRY_LIMIT_SHORT_SHIFT			8
 #define	RETRY_LIMIT_LONG_SHIFT			0
 
+#define	RL_VAL_AP					7
+#ifdef CONFIG_RTW_CUSTOMIZE_RLSTA
+#define	RL_VAL_STA					CONFIG_RTW_CUSTOMIZE_RLSTA
+#else
+#define	RL_VAL_STA					0x30
+#endif
 /* -----------------------------------------------------
  *
  *	0x0500h ~ 0x05FFh	EDCA Configuration
@@ -1803,7 +1805,11 @@ Current IOREG MAP
  * General definitions
  * ******************************************************** */
 
-#define LAST_ENTRY_OF_TX_PKT_BUFFER_8188E(__Adapter)	   (IS_VENDOR_8188E_I_CUT_SERIES(__Adapter) ? 255 : 175)
+#ifdef CONFIG_USB_HCI
+	#define LAST_ENTRY_OF_TX_PKT_BUFFER_8188E(__Adapter)	(175)
+#else
+	#define LAST_ENTRY_OF_TX_PKT_BUFFER_8188E(__Adapter)	(IS_VENDOR_8188E_I_CUT_SERIES(__Adapter) ? 255 : 175)
+#endif
 #define LAST_ENTRY_OF_TX_PKT_BUFFER_8812			255
 #define LAST_ENTRY_OF_TX_PKT_BUFFER_8723B		255
 #define LAST_ENTRY_OF_TX_PKT_BUFFER_8192C		255

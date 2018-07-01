@@ -1,6 +1,6 @@
 /******************************************************************************
  *
- * Copyright(c) 2007 - 2012 Realtek Corporation. All rights reserved.
+ * Copyright(c) 2007 - 2017 Realtek Corporation.
  *
  * This program is free software; you can redistribute it and/or modify it
  * under the terms of version 2 of the GNU General Public License as
@@ -11,12 +11,7 @@
  * FITNESS FOR A PARTICULAR PURPOSE. See the GNU General Public License for
  * more details.
  *
- * You should have received a copy of the GNU General Public License along with
- * this program; if not, write to the Free Software Foundation, Inc.,
- * 51 Franklin Street, Fifth Floor, Boston, MA 02110, USA
- *
- *
- ******************************************************************************/
+ *****************************************************************************/
 #ifndef __COMMON_H2C_H__
 #define __COMMON_H2C_H__
 
@@ -137,7 +132,7 @@ enum h2c_cmd {
 #define H2C_PSTUNEPARAM_LEN			4
 #define H2C_MACID_CFG_LEN		7
 #define H2C_BTMP_OPER_LEN			5
-#define H2C_WOWLAN_LEN			5
+#define H2C_WOWLAN_LEN			6
 #define H2C_REMOTE_WAKE_CTRL_LEN	3
 #define H2C_AOAC_GLOBAL_INFO_LEN	2
 #define H2C_AOAC_RSVDPAGE_LOC_LEN	7
@@ -254,7 +249,8 @@ enum h2c_cmd {
 #define H2C_MSR_ROLE_GO		4
 #define H2C_MSR_ROLE_TDLS	5
 #define H2C_MSR_ROLE_ADHOC	6
-#define H2C_MSR_ROLE_MAX	7
+#define H2C_MSR_ROLE_MESH	7
+#define H2C_MSR_ROLE_MAX	8
 
 extern const char *const _h2c_msr_role_str[];
 #define h2c_msr_role_str(role) (((role) >= H2C_MSR_ROLE_MAX) ? _h2c_msr_role_str[H2C_MSR_ROLE_MAX] : _h2c_msr_role_str[(role)])

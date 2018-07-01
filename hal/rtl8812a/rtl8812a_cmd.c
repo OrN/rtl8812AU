@@ -1,6 +1,6 @@
 /******************************************************************************
  *
- * Copyright(c) 2007 - 2011 Realtek Corporation. All rights reserved.
+ * Copyright(c) 2007 - 2017 Realtek Corporation.
  *
  * This program is free software; you can redistribute it and/or modify it
  * under the terms of version 2 of the GNU General Public License as
@@ -11,12 +11,7 @@
  * FITNESS FOR A PARTICULAR PURPOSE. See the GNU General Public License for
  * more details.
  *
- * You should have received a copy of the GNU General Public License along with
- * this program; if not, write to the Free Software Foundation, Inc.,
- * 51 Franklin Street, Fifth Floor, Boston, MA 02110, USA
- *
- *
- ******************************************************************************/
+ *****************************************************************************/
 #define _RTL8812A_CMD_C_
 
 /* #include <drv_types.h> */
@@ -214,10 +209,14 @@ Get_RA_ShortGI_8812(
 
 void
 set_ra_ldpc_8812(
-	struct sta_info	*psta,
+	struct cmn_sta_info	*pcmn_info,
 	BOOLEAN			bLDPC
 )
 {
+	struct sta_info		*psta = NULL;
+
+	psta = LIST_CONTAINOR(pcmn_info, struct sta_info, cmn);
+
 	if (psta == NULL)
 		return;
 #ifdef CONFIG_80211AC_VHT
@@ -236,102 +235,7 @@ set_ra_ldpc_8812(
 	update_ldpc_stbc_cap(psta);
 #endif
 
-	/* RTW_INFO("MacId %d bLDPC %d\n", psta->mac_id, bLDPC); */
-}
-
-
-u8
-Get_RA_LDPC_8812(
-	struct sta_info		*psta
-)
-{
-	u8	bLDPC = 0;
-
-	if (psta != NULL) {
-		if (IS_MCAST(psta->hwaddr))
-			bLDPC = 0;
-		else {
-#ifdef CONFIG_80211AC_VHT
-			if (is_supported_vht(psta->wireless_mode)) {
-				if (TEST_FLAG(psta->vhtpriv.ldpc_cap, LDPC_VHT_CAP_TX))
-					bLDPC = 1;
-				else
-					bLDPC = 0;
-			} else if (is_supported_ht(psta->wireless_mode)) {
-				if (TEST_FLAG(psta->htpriv.ldpc_cap, LDPC_HT_CAP_TX))
-					bLDPC = 1;
-				else
-					bLDPC = 0;
-			} else
-#endif
-				bLDPC = 0;
-		}
-	}
-
-	return bLDPC << 2;
-}
-
-void rtl8812_set_raid_cmd(PADAPTER padapter, u32 bitmap, u8 *arg, u8 bw)
-{
-	HAL_DATA_TYPE	*pHalData = GET_HAL_DATA(padapter);
-	struct macid_ctl_t *macid_ctl = &padapter->dvobj->macid_ctl;
-	struct sta_info	*psta = NULL;
-	u8 macid, init_rate, raid, shortGIrate = _FALSE;
-	u8 ignore_bw = _FALSE;
-
-	macid = arg[0];
-	raid = arg[1];
-	shortGIrate = arg[2] & 0x0F;
-	ignore_bw = arg[2] >> 4;
-	init_rate = arg[3];
-
-	if (macid < macid_ctl->num)
-		psta = macid_ctl->sta[macid];
-	if (psta == NULL) {
-		RTW_PRINT(FUNC_ADPT_FMT" macid:%u, sta is NULL\n"
-			  , FUNC_ADPT_ARG(padapter), macid);
-		return;
-	}
-
-	if (pHalData->fw_ractrl == _TRUE) {
-		u8	H2CCommand[7] = {0};
-
-		shortGIrate = Get_RA_ShortGI_8812(padapter, psta, shortGIrate, bitmap);
-
-		H2CCommand[0] = macid;
-		H2CCommand[1] = (raid & 0x1F) | (shortGIrate ? 0x80 : 0x00) ;
-		H2CCommand[2] = (bw & 0x3) | Get_RA_LDPC_8812(psta) | Get_VHT_ENI(0, psta->wireless_mode, bitmap);
-		if (ignore_bw)
-			H2CCommand[2] |= BIT(3);
-		/* DisableTXPowerTraining */
-		if (pHalData->bDisableTXPowerTraining) {
-			H2CCommand[2] |= BIT6;
-			RTW_INFO("%s,Disable PWT by driver\n", __FUNCTION__);
-		} else {
-			struct PHY_DM_STRUCT	*pDM_OutSrc = &pHalData->odmpriv;
-
-			if (pDM_OutSrc->is_disable_power_training) {
-				H2CCommand[2] |= BIT6;
-				RTW_INFO("%s,Disable PWT by DM\n", __FUNCTION__);
-			}
-		}
-
-		H2CCommand[3] = (u8)(bitmap & 0x000000ff);
-		H2CCommand[4] = (u8)((bitmap & 0x0000ff00) >> 8);
-		H2CCommand[5] = (u8)((bitmap & 0x00ff0000) >> 16);
-		H2CCommand[6] = (u8)((bitmap & 0xff000000) >> 24);
-
-		/* RTW_INFO("rtl8812_set_raid_cmd, bitmap=0x%x, mac_id=0x%x, raid=0x%x, shortGIrate=%x\n", bitmap, macid, raid, shortGIrate); */
-
-		fill_h2c_cmd_8812(padapter, H2C_8812_RA_MASK, 7, H2CCommand);
-	}
-
-	if (shortGIrate == _TRUE)
-		init_rate |= BIT(7);
-
-	pHalData->INIDATA_RATE[macid] = init_rate;
-
-
+	/* RTW_INFO("MacId %d bLDPC %d\n", psta->cmn.mac_id, bLDPC); */
 }
 
 #ifdef CONFIG_FWLPS_IN_IPS
@@ -347,10 +251,10 @@ void rtl8812_set_FwPwrMode_cmd(PADAPTER padapter, u8 PSMode)
 	struct pwrctrl_priv *pwrpriv = adapter_to_pwrctl(padapter);
 	u8	Mode = 0, RLBM = 0, PowerState = 0, LPSAwakeIntvl = 2, pwrModeByte5 = 0;
 	HAL_DATA_TYPE	*pHalData = GET_HAL_DATA(padapter);
+	u8 allQueueUAPSD = 0;
 
 
-	RTW_INFO("%s: Mode=%d SmartPS=%d UAPSD=%d\n", __FUNCTION__,
-		PSMode, pwrpriv->smart_ps, padapter->registrypriv.uapsd_enable);
+	RTW_INFO("%s: Mode=%d SmartPS=%d\n", __FUNCTION__,	PSMode, pwrpriv->smart_ps);
 
 	switch (PSMode) {
 	case PS_MODE_ACTIVE:
@@ -409,7 +313,7 @@ void rtl8812_set_FwPwrMode_cmd(PADAPTER padapter, u8 PSMode)
 	SET_8812_H2CCMD_PWRMODE_PARM_BCN_PASS_TIME(u1H2CSetPwrMode, LPSAwakeIntvl);
 
 	/* (WMM only)bAllQueueUAPSD */
-	SET_8812_H2CCMD_PWRMODE_PARM_ALL_QUEUE_UAPSD(u1H2CSetPwrMode, padapter->registrypriv.uapsd_enable);
+	SET_8812_H2CCMD_PWRMODE_PARM_ALL_QUEUE_UAPSD(u1H2CSetPwrMode, allQueueUAPSD);
 
 	/* AllON(0x0C), RFON(0x04), RFOFF(0x00) */
 	SET_8812_H2CCMD_PWRMODE_PARM_PWR_STATE(u1H2CSetPwrMode, PowerState);
@@ -753,25 +657,6 @@ static void ConstructGTKResponse(
 }
 #endif /* CONFIG_GTK_OL */
 
-/* To check if reserved page content is destroyed by beacon beacuse beacon is too large.
- * 2010.06.23. Added by tynli. */
-VOID
-CheckFwRsvdPageContent(
-	IN	PADAPTER		Adapter
-)
-{
-	HAL_DATA_TYPE	*pHalData = GET_HAL_DATA(Adapter);
-	u32	MaxBcnPageNum;
-
-	if (pHalData->FwRsvdPageStartOffset != 0) {
-		/*MaxBcnPageNum = PageNum_128(pMgntInfo->MaxBeaconSize);
-		RT_ASSERT((MaxBcnPageNum <= pHalData->FwRsvdPageStartOffset),
-			("CheckFwRsvdPageContent(): The reserved page content has been"\
-			"destroyed by beacon!!! MaxBcnPageNum(%d) FwRsvdPageStartOffset(%d)\n!",
-			MaxBcnPageNum, pHalData->FwRsvdPageStartOffset));*/
-	}
-}
-
 /*
  * Description: Get the reserved page number in Tx packet buffer.
  * Retrun value: the page number.
@@ -860,8 +745,6 @@ static void SetFwRsvdPagePkt_8812(PADAPTER padapter, BOOLEAN bDLFinished)
 		RTW_INFO("%s(): Beacon page size = %d\n", __FUNCTION__, TotalPageNum);
 	} else {
 		TotalPageNum += CurtPktPageNum;
-
-		pHalData->FwRsvdPageStartOffset = TotalPageNum;
 
 		BufIndex += (CurtPktPageNum * PageSize);
 
@@ -1056,54 +939,6 @@ void rtl8812_set_p2p_ps_offload_cmd(_adapter *padapter, u8 p2p_ps_state)
 }
 #endif /* CONFIG_P2P */
 
-#ifdef CONFIG_TSF_RESET_OFFLOAD
-/*
-	ask FW to Reset sync register at Beacon early interrupt
-*/
-u8 rtl8812_reset_tsf(_adapter *padapter, u8 reset_port)
-{
-	u8	buf[2];
-	u8	res = _SUCCESS;
-
-	s32 ret;
-	if (HW_PORT0 == reset_port) {
-		buf[0] = 0x1;
-		buf[1] = 0;
-	} else {
-		buf[0] = 0x0;
-		buf[1] = 0x1;
-	}
-
-	ret = fill_h2c_cmd_8812(padapter, H2C_8812_TSF_RESET, 2, buf);
-
-
-	return res;
-}
-
-int reset_tsf(PADAPTER Adapter, u8 reset_port)
-{
-	u8 reset_cnt_before = 0, reset_cnt_after = 0, loop_cnt = 0;
-	u32 reg_reset_tsf_cnt = (HW_PORT0 == reset_port) ?
-				REG_FW_RESET_TSF_CNT_0 : REG_FW_RESET_TSF_CNT_1;
-	u32 reg_bcncrtl = (HW_PORT0 == reset_port) ?
-			  REG_BCN_CTRL_1 : REG_BCN_CTRL;
-
-	rtw_mi_buddy_scan_abort(Adapter, _FALSE);	/*	site survey will cause reset_tsf fail	*/
-	reset_cnt_after = reset_cnt_before = rtw_read8(Adapter, reg_reset_tsf_cnt);
-	rtl8812_reset_tsf(Adapter, reset_port);
-
-	while ((reset_cnt_after == reset_cnt_before) && (loop_cnt < 10)) {
-		rtw_msleep_os(100);
-		loop_cnt++;
-		reset_cnt_after = rtw_read8(Adapter, reg_reset_tsf_cnt);
-	}
-
-	return (loop_cnt >= 10) ? _FAIL : _TRUE;
-}
-
-
-#endif /* CONFIG_TSF_RESET_OFFLOAD */
-
 static void rtl8812_set_FwRsvdPage_cmd(PADAPTER padapter, PRSVDPAGE_LOC rsvdpageloc)
 {
 	u8 u1H2CRsvdPageParm[H2C_RSVDPAGE_LOC_LEN] = {0};
@@ -1164,7 +999,7 @@ static void rtl8812_set_FwAoacRsvdPage_cmd(PADAPTER padapter, PRSVDPAGE_LOC rsvd
 	fill_h2c_cmd_8812(padapter, H2C_AOAC_RSVD_PAGE, H2C_AOAC_RSVDPAGE_LOC_LEN, u1H2CAoacRsvdPageParm);
 
 #ifdef CONFIG_PNO_SUPPORT
-	if (!check_fwstate(pmlmepriv, WIFI_AP_STATE) &&
+	if (!MLME_IS_AP(padapter) && !MLME_IS_MESH(padapter) &&
 	    !check_fwstate(pmlmepriv, _FW_LINKED) &&
 	    pwrpriv->wowlan_in_resume == _FALSE) {
 
@@ -1191,7 +1026,7 @@ void rtl8812_set_FwJoinBssReport_cmd(PADAPTER padapter, u8 mstatus)
 	BOOLEAN		bcn_valid = _FALSE;
 	u8	DLBcnCount = 0;
 	u32 poll = 0;
-
+	u8 RegFwHwTxQCtrl;
 
 	RTW_INFO("%s mstatus(%x)\n", __func__ , mstatus);
 
@@ -1210,8 +1045,8 @@ void rtl8812_set_FwJoinBssReport_cmd(PADAPTER padapter, u8 mstatus)
 		*/
 
 		/*Set REG_CR bit 8. DMA beacon by SW.*/
-		pHalData->RegCR_1 |= BIT0;
-		rtw_write8(padapter ,  REG_CR + 1 , pHalData->RegCR_1);
+		rtw_write8(padapter, REG_CR + 1,
+			rtw_read8(padapter, REG_CR + 1) | BIT0);
 
 		/*
 		* Disable Hw protection for a time which revserd for Hw sending beacon.
@@ -1222,15 +1057,16 @@ void rtl8812_set_FwJoinBssReport_cmd(PADAPTER padapter, u8 mstatus)
 		*/
 		rtw_write8(padapter, REG_BCN_CTRL , rtw_read8(padapter , REG_BCN_CTRL) & (~BIT(3)));
 		rtw_write8(padapter, REG_BCN_CTRL , rtw_read8(padapter , REG_BCN_CTRL) | BIT(4));
+		RegFwHwTxQCtrl = rtw_read8(padapter, REG_FWHW_TXQ_CTRL + 2);
 
-		if (pHalData->RegFwHwTxQCtrl & BIT6) {
+		if (RegFwHwTxQCtrl & BIT6) {
 			RTW_INFO("HalDownloadRSVDPage(): There is an Adapter is sending beacon.\n");
 			bSendBeacon = _TRUE;
 		}
 
 		/* Set FWHW_TXQ_CTRL 0x422[6]=0 to tell Hw the packet is not a real beacon frame.*/
-		rtw_write8(padapter , REG_FWHW_TXQ_CTRL + 2 , (pHalData->RegFwHwTxQCtrl & (~BIT6)));
-		pHalData->RegFwHwTxQCtrl &= (~BIT6);
+		RegFwHwTxQCtrl &= (~BIT6);
+		rtw_write8(padapter, REG_FWHW_TXQ_CTRL + 2, RegFwHwTxQCtrl);
 
 #if defined(CONFIG_USB_HCI)
 		if (IS_FULL_SPEED_USB(padapter)) {
@@ -1326,8 +1162,8 @@ void rtl8812_set_FwJoinBssReport_cmd(PADAPTER padapter, u8 mstatus)
 		* 2010.06.23. Added by tynli.
 		*/
 		if (bSendBeacon) {
-			rtw_write8(padapter , REG_FWHW_TXQ_CTRL + 2 , (pHalData->RegFwHwTxQCtrl | BIT6));
-			pHalData->RegFwHwTxQCtrl |= BIT6;
+			RegFwHwTxQCtrl |= BIT6;
+			rtw_write8(padapter, REG_FWHW_TXQ_CTRL + 2, RegFwHwTxQCtrl);
 		}
 
 
@@ -1343,8 +1179,8 @@ void rtl8812_set_FwJoinBssReport_cmd(PADAPTER padapter, u8 mstatus)
 		{
 #ifndef CONFIG_PCI_HCI
 			/* Clear CR[8] or beacon packet will not be send to TxBuf anymore.*/
-			pHalData->RegCR_1 &= (~BIT0);
-			rtw_write8(padapter,  REG_CR + 1 , pHalData->RegCR_1);
+			rtw_write8(padapter, REG_CR + 1,
+				rtw_read8(padapter, REG_CR + 1) & (~BIT0));
 #endif
 		}
 	}
@@ -1620,7 +1456,7 @@ void rtl8812a_download_BTCoex_AP_mode_rsvd_page(PADAPTER padapter)
 	u8	DLBcnCount = 0;
 	u32 poll = 0;
 	u8 val8;
-	u8 v8;
+	u8 v8, RegFwHwTxQCtrl;
 
 
 	RTW_INFO("+" FUNC_ADPT_FMT ": hw_port=%d\n",
@@ -1644,12 +1480,13 @@ void rtl8812a_download_BTCoex_AP_mode_rsvd_page(PADAPTER padapter)
 	rtw_write8(padapter, REG_BCN_CTRL, val8);
 
 	/* Set FWHW_TXQ_CTRL 0x422[6]=0 to tell Hw the packet is not a real beacon frame. */
-	if (pHalData->RegFwHwTxQCtrl & BIT(6))
+	RegFwHwTxQCtrl = rtw_read8(padapter, REG_FWHW_TXQ_CTRL + 2);
+	if (RegFwHwTxQCtrl & BIT(6))
 		bRecover = _TRUE;
 
 	/* To tell Hw the packet is not a real beacon frame. */
-	rtw_write8(padapter, REG_FWHW_TXQ_CTRL + 2, pHalData->RegFwHwTxQCtrl & ~BIT(6));
-	pHalData->RegFwHwTxQCtrl &= ~BIT(6);
+	RegFwHwTxQCtrl &= ~BIT(6);
+	rtw_write8(padapter, REG_FWHW_TXQ_CTRL + 2, RegFwHwTxQCtrl);
 
 
 #if defined(CONFIG_USB_HCI)
@@ -1702,8 +1539,8 @@ void rtl8812a_download_BTCoex_AP_mode_rsvd_page(PADAPTER padapter)
 	/* the beacon cannot be sent by HW. */
 	/* 2010.06.23. Added by tynli. */
 	if (bRecover) {
-		rtw_write8(padapter, REG_FWHW_TXQ_CTRL + 2, pHalData->RegFwHwTxQCtrl | BIT(6));
-		pHalData->RegFwHwTxQCtrl |= BIT(6);
+		RegFwHwTxQCtrl |= BIT(6);
+		rtw_write8(padapter, REG_FWHW_TXQ_CTRL + 2, RegFwHwTxQCtrl);
 	}
 
 #ifndef CONFIG_PCI_HCI

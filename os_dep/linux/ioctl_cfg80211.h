@@ -1,6 +1,6 @@
 /******************************************************************************
  *
- * Copyright(c) 2007 - 2011 Realtek Corporation. All rights reserved.
+ * Copyright(c) 2007 - 2017 Realtek Corporation.
  *
  * This program is free software; you can redistribute it and/or modify it
  * under the terms of version 2 of the GNU General Public License as
@@ -11,12 +11,7 @@
  * FITNESS FOR A PARTICULAR PURPOSE. See the GNU General Public License for
  * more details.
  *
- * You should have received a copy of the GNU General Public License along with
- * this program; if not, write to the Free Software Foundation, Inc.,
- * 51 Franklin Street, Fifth Floor, Boston, MA 02110, USA
- *
- *
- ******************************************************************************/
+ *****************************************************************************/
 #ifndef __IOCTL_CFG80211_H__
 #define __IOCTL_CFG80211_H__
 
@@ -53,6 +48,11 @@
 	#ifndef RTW_DEDICATED_P2P_DEVICE
 		#define RTW_DEDICATED_P2P_DEVICE
 	#endif
+#endif
+
+#ifndef CONFIG_RADIO_WORK
+#define RTW_ROCH_DURATION_ENLARGE
+#define RTW_ROCH_BACK_OP
 #endif
 
 #if !defined(CONFIG_P2P) && RTW_P2P_GROUP_INTERFACE
@@ -144,7 +144,7 @@ struct rtw_wdev_priv {
 	char ifname_mon[IFNAMSIZ + 1]; /* interface name for monitor interface */
 
 	u8 p2p_enabled;
-	u32 probe_resp_ie_update_time;
+	systime probe_resp_ie_update_time;
 
 	u8 provdisc_req_issued;
 
@@ -281,6 +281,7 @@ void rtw_pd_iface_free(struct wiphy *wiphy);
 
 void rtw_cfg80211_set_is_mgmt_tx(_adapter *adapter, u8 val);
 u8 rtw_cfg80211_get_is_mgmt_tx(_adapter *adapter);
+u8 rtw_mgnt_tx_handler(_adapter *adapter, u8 *buf);
 
 void rtw_cfg80211_issue_p2p_provision_request(_adapter *padapter, const u8 *buf, size_t len);
 
@@ -292,7 +293,11 @@ void rtw_cfg80211_rx_probe_request(_adapter *padapter, union recv_frame *rframe)
 int rtw_cfg80211_set_mgnt_wpsp2pie(struct net_device *net, char *buf, int len, int type);
 
 bool rtw_cfg80211_pwr_mgmt(_adapter *adapter);
-void rtw_cfg80211_set_securitypriv(_adapter *padapter, u8 *buf);
+
+#ifdef CONFIG_RFKILL_POLL
+void rtw_cfg80211_init_rfkill(struct wiphy *wiphy);
+void rtw_cfg80211_deinit_rfkill(struct wiphy *wiphy);
+#endif
 
 #if (LINUX_VERSION_CODE < KERNEL_VERSION(3, 4, 0))  && !defined(COMPAT_KERNEL_RELEASE)
 #define rtw_cfg80211_rx_mgmt(wdev, freq, sig_dbm, buf, len, gfp) cfg80211_rx_mgmt(wdev_to_ndev(wdev), freq, buf, len, gfp)
@@ -343,6 +348,10 @@ void rtw_cfg80211_set_securitypriv(_adapter *padapter, u8 *buf);
 #else
 	#error "Cannot support FT for KERNEL_VERSION < 3.10\n"
 #endif
+#endif
+
+#if (LINUX_VERSION_CODE >= KERNEL_VERSION(3, 5, 0))
+u8 rtw_cfg80211_ch_switch_notify(_adapter *adapter, u8 ch, u8 bw, u8 offset, u8 ht);
 #endif
 
 #if (KERNEL_VERSION(4, 7, 0) >= LINUX_VERSION_CODE)

@@ -1,6 +1,6 @@
 /******************************************************************************
  *
- * Copyright(c) 2007 - 2011 Realtek Corporation. All rights reserved.
+ * Copyright(c) 2007 - 2017 Realtek Corporation.
  *
  * This program is free software; you can redistribute it and/or modify it
  * under the terms of version 2 of the GNU General Public License as
@@ -11,16 +11,12 @@
  * FITNESS FOR A PARTICULAR PURPOSE. See the GNU General Public License for
  * more details.
  *
- * You should have received a copy of the GNU General Public License along with
- * this program; if not, write to the Free Software Foundation, Inc.,
- * 51 Franklin Street, Fifth Floor, Boston, MA 02110, USA
- *
- *
- ******************************************************************************/
+ *****************************************************************************/
 #define _RTL8812AU_LED_C_
 
 /* #include <drv_types.h> */
 #include <rtl8812a_hal.h>
+#ifdef CONFIG_RTW_SW_LED
 
 /* ********************************************************************************
  * LED object.
@@ -390,3 +386,4 @@ rtl8812au_DeInitSwLeds(
 	DeInitLed(&(ledpriv->SwLed1));
 	DeInitLed(&(ledpriv->SwLed2));
 }
+#endif

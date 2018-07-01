@@ -1,6 +1,6 @@
 /******************************************************************************
  *
- * Copyright(c) 2007 - 2011 Realtek Corporation. All rights reserved.
+ * Copyright(c) 2007 - 2017 Realtek Corporation.
  *
  * This program is free software; you can redistribute it and/or modify it
  * under the terms of version 2 of the GNU General Public License as
@@ -11,12 +11,7 @@
  * FITNESS FOR A PARTICULAR PURPOSE. See the GNU General Public License for
  * more details.
  *
- * You should have received a copy of the GNU General Public License along with
- * this program; if not, write to the Free Software Foundation, Inc.,
- * 51 Franklin Street, Fifth Floor, Boston, MA 02110, USA
- *
- *
- ******************************************************************************/
+ *****************************************************************************/
 /* ***** temporarily flag ******* */
 #define CONFIG_SINGLE_IMG
 /* #define CONFIG_DISABLE_ODM */
@@ -84,10 +79,6 @@
 
 #define CONFIG_RECV_REORDERING_CTRL	1
 
-/* #define CONFIG_TCP_CSUM_OFFLOAD_RX	1 */
-
-/* #define CONFIG_DRVEXT_MODULE	1 */
-
 #define CONFIG_DFS	1
 
  /* #define CONFIG_SUPPORT_USB_INT */
@@ -95,7 +86,7 @@
 /* #define CONFIG_USB_INTERRUPT_IN_PIPE	1 */
 #endif
 
-/* #ifndef CONFIG_MP_INCLUDED */
+#ifdef CONFIG_POWER_SAVING
 	#define CONFIG_IPS	1
 	#ifdef CONFIG_IPS
 	/* #define CONFIG_IPS_LEVEL_2	1 */ /* enable this to set default IPS mode to IPS_LEVEL_2	 */
@@ -121,7 +112,7 @@
 		#endif /* !CONFIG_SUPPORT_USB_INT */
 		/* #define DBG_CHECK_FW_PS_STATE */
 	#endif /* CONFIG_LPS_LCLK */
-
+#endif /*CONFIG_POWER_SAVING*/
 	/*#define CONFIG_ANTENNA_DIVERSITY*/
 
 
@@ -131,7 +122,6 @@
 		#define CONFIG_RUNTIME_PORT_SWITCH
 
 		/* #define DBG_RUNTIME_PORT_SWITCH */
-		#define CONFIG_SCAN_BACKOP
 		/* #ifdef CONFIG_RTL8812A */
 		/*	#define CONFIG_TSF_RESET_OFFLOAD 1 */		/* For 2 PORT TSF SYNC. */
 		/* #endif */
@@ -188,13 +178,13 @@
 
 #define CONFIG_SKB_COPY	1/* for amsdu */
 
-#define CONFIG_LED
-#ifdef CONFIG_LED
-	#define CONFIG_SW_LED
-	#ifdef CONFIG_SW_LED
-		/* #define CONFIG_LED_HANDLED_BY_CMD_THREAD */
+#define CONFIG_RTW_LED
+#ifdef CONFIG_RTW_LED
+	#define CONFIG_RTW_SW_LED
+	#ifdef CONFIG_RTW_SW_LED
+		/* #define CONFIG_RTW_LED_HANDLED_BY_CMD_THREAD */
 	#endif
-#endif /* CONFIG_LED */
+#endif /* CONFIG_RTW_LED */
 
 #define CONFIG_GLOBAL_UI_PID
 
@@ -255,7 +245,7 @@
 
 #ifdef CONFIG_WOWLAN
 	#define CONFIG_GTK_OL
-	#define CONFIG_ARP_KEEP_ALIVE
+	/* #define CONFIG_ARP_KEEP_ALIVE */
 #endif /* CONFIG_WOWLAN */
 
 #ifdef CONFIG_GPIO_WAKEUP

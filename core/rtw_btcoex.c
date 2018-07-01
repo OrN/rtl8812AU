@@ -1,6 +1,6 @@
 /******************************************************************************
  *
- * Copyright(c) 2013 Realtek Corporation. All rights reserved.
+ * Copyright(c) 2013 - 2017 Realtek Corporation.
  *
  * This program is free software; you can redistribute it and/or modify it
  * under the terms of version 2 of the GNU General Public License as
@@ -11,12 +11,7 @@
  * FITNESS FOR A PARTICULAR PURPOSE. See the GNU General Public License for
  * more details.
  *
- * You should have received a copy of the GNU General Public License along with
- * this program; if not, write to the Free Software Foundation, Inc.,
- * 51 Franklin Street, Fifth Floor, Boston, MA 02110, USA
- *
- *
- ******************************************************************************/
+ *****************************************************************************/
 #ifdef CONFIG_BT_COEXIST
 
 #include <drv_types.h>
@@ -243,6 +238,16 @@ void rtw_btcoex_HaltNotify(PADAPTER padapter)
 void rtw_btcoex_switchband_notify(u8 under_scan, u8 band_type)
 {
 	hal_btcoex_switchband_notify(under_scan, band_type);
+}
+
+void rtw_btcoex_WlFwDbgInfoNotify(PADAPTER padapter, u8* tmpBuf, u8 length)
+{
+	hal_btcoex_WlFwDbgInfoNotify(padapter, tmpBuf, length);
+}
+
+void rtw_btcoex_rx_rate_change_notify(PADAPTER padapter, u8 is_data_frame, u8 rate_id)
+{
+	hal_btcoex_rx_rate_change_notify(padapter, is_data_frame, rate_id);
 }
 
 void rtw_btcoex_SwitchBtTRxMask(PADAPTER padapter)

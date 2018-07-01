@@ -1,3 +1,17 @@
+/******************************************************************************
+ *
+ * Copyright(c) 2016 - 2017 Realtek Corporation.
+ *
+ * This program is free software; you can redistribute it and/or modify it
+ * under the terms of version 2 of the GNU General Public License as
+ * published by the Free Software Foundation.
+ *
+ * This program is distributed in the hope that it will be useful, but WITHOUT
+ * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
+ * FITNESS FOR A PARTICULAR PURPOSE. See the GNU General Public License for
+ * more details.
+ *
+ *****************************************************************************/
 
 #if (BT_SUPPORT == 1 && COEX_SUPPORT == 1)
 
@@ -120,6 +134,7 @@ enum bt_8821c_2ant_coex_algo {
 	BT_8821C_2ANT_COEX_ALGO_HID_A2DP_PANEDR	= 0x9,
 	BT_8821C_2ANT_COEX_ALGO_HID_A2DP			= 0xa,
 	BT_8821C_2ANT_COEX_ALGO_NOPROFILEBUSY		= 0xb,
+	BT_8821C_2ANT_COEX_ALGO_A2DPSINK		= 0xc,
 	BT_8821C_2ANT_COEX_ALGO_MAX
 };
 
@@ -254,18 +269,20 @@ struct coex_dm_8821c_2ant {
 
 	u8		pre_int_block_status;
 	u8		cur_int_block_status;
+
+	u8		cur_antdiv_type;
 };
 
 struct coex_sta_8821c_2ant {
-	boolean					bt_disabled;
-	boolean					bt_link_exist;
-	boolean					sco_exist;
-	boolean					a2dp_exist;
-	boolean					hid_exist;
-	boolean					pan_exist;
+	boolean				bt_disabled;
+	boolean				bt_link_exist;
+	boolean				sco_exist;
+	boolean				a2dp_exist;
+	boolean				hid_exist;
+	boolean				pan_exist;
 
-	boolean					under_lps;
-	boolean					under_ips;
+	boolean				under_lps;
+	boolean				under_ips;
 	u32					high_priority_tx;
 	u32					high_priority_rx;
 	u32					low_priority_tx;
@@ -277,8 +294,8 @@ struct coex_sta_8821c_2ant {
 	u8					bt_info_c2h[BT_INFO_SRC_8821C_2ANT_MAX][10];
 	u32					bt_info_c2h_cnt[BT_INFO_SRC_8821C_2ANT_MAX];
 	boolean				bt_whck_test;
-	boolean					c2h_bt_inquiry_page;
-	boolean					c2h_bt_remote_name_req;
+	boolean				c2h_bt_inquiry_page;
+	boolean				c2h_bt_remote_name_req;
 
 	u8					bt_info_ext;
 	u8					bt_info_ext2;
@@ -296,19 +313,23 @@ struct coex_sta_8821c_2ant {
 	u32					crc_err_11n;
 	u32					crc_err_11n_vht;
 
-	boolean					cck_lock;
-	boolean					pre_ccklock;
-	boolean					cck_ever_lock;
+	u32					acc_crc_ratio;
+	u32					now_crc_ratio;
+	u32					cnt_crcok_max_in_10s;
+
+	boolean				cck_lock;
+	boolean				cck_lock_ever;
+	boolean				cck_lock_warn;
 
 	u8					coex_table_type;
-	boolean					force_lps_on;
+	boolean				force_lps_ctrl;
 
 	u8					dis_ver_info_cnt;
 
 	u8					a2dp_bit_pool;
 	u8					cut_version;
 
-	boolean					concurrent_rx_mode_on;
+	boolean				concurrent_rx_mode_on;
 
 	u16					score_board;
 	u8					isolation_btween_wb;   /* 0~ 50 */
@@ -360,6 +381,29 @@ struct coex_sta_8821c_2ant {
 
 	boolean             is_eSCO_mode;
 	u8                  switch_band_notify_to;
+	boolean				is_rf_state_off;
+
+	boolean				is_hid_low_pri_tx_overhead;
+	boolean				is_bt_multi_link;
+	boolean				is_bt_a2dp_sink;
+	boolean				is_set_ps_state_fail;
+	u8					cnt_set_ps_state_fail;
+
+	u8					wl_fw_dbg_info[10];
+	u8					wl_rx_rate;
+	u8					wl_rts_rx_rate;
+	u8					wl_center_channel;
+
+	u16					score_board_WB;
+	boolean				is_hid_rcu;
+	u16					legacy_forbidden_slot;
+	u16					le_forbidden_slot;
+	u8					bt_a2dp_vendor_id;
+	u32					bt_a2dp_device_name;
+	boolean				is_ble_scan_toggle;
+
+	boolean				is_bt_opp_exist;
+	boolean				gl_wifi_busy;
 };
 
 
@@ -380,7 +424,7 @@ struct rfe_type_8821c_2ant {
 
 	boolean		ant_at_main_port;
 
-	boolean		wlg_Locate_at_btg;				/*  If true:  WLG at BTG, If false: WLG at WLAG */
+	boolean		wlg_Locate_at_btg;				/*  If TRUE:  WLG at BTG, If FALSE: WLG at WLAG */
 
 	boolean		ext_ant_switch_diversity;		/* If diversity on */
 };
@@ -454,12 +498,17 @@ void ex_halbtc8821c2ant_specific_packet_notify(IN struct btc_coexist *btcoexist,
 		IN u8 type);
 void ex_halbtc8821c2ant_bt_info_notify(IN struct btc_coexist *btcoexist,
 				       IN u8 *tmp_buf, IN u8 length);
+void ex_halbtc8821c2ant_wl_fwdbginfo_notify(IN struct btc_coexist *btcoexist,
+				       IN u8 *tmp_buf, IN u8 length);
+void ex_halbtc8821c2ant_rx_rate_change_notify(IN struct btc_coexist *btcoexist,
+		IN BOOLEAN is_data_frame, IN u8 btc_rate_id);
 void ex_halbtc8821c2ant_rf_status_notify(IN struct btc_coexist *btcoexist,
 		IN u8 type);
 void ex_halbtc8821c2ant_halt_notify(IN struct btc_coexist *btcoexist);
 void ex_halbtc8821c2ant_pnp_notify(IN struct btc_coexist *btcoexist,
 				   IN u8 pnp_state);
 void ex_halbtc8821c2ant_periodical(IN struct btc_coexist *btcoexist);
+void ex_halbtc8821c2ant_display_simple_coex_info(IN struct btc_coexist *btcoexist);
 void ex_halbtc8821c2ant_display_coex_info(IN struct btc_coexist *btcoexist);
 void ex_halbtc8821c2ant_antenna_detection(IN struct btc_coexist *btcoexist,
 		IN u32 cent_freq, IN u32 offset, IN u32 span, IN u32 seconds);
@@ -474,15 +523,18 @@ void ex_halbtc8821c2ant_display_ant_detection(IN struct btc_coexist *btcoexist);
 #define	ex_halbtc8821c2ant_ips_notify(btcoexist, type)
 #define	ex_halbtc8821c2ant_lps_notify(btcoexist, type)
 #define	ex_halbtc8821c2ant_scan_notify(btcoexist, type)
-#define   ex_halbtc8821c2ant_switchband_notify(btcoexist,type)
+#define	ex_halbtc8821c2ant_switchband_notify(btcoexist, type)
 #define	ex_halbtc8821c2ant_connect_notify(btcoexist, type)
 #define	ex_halbtc8821c2ant_media_status_notify(btcoexist, type)
 #define	ex_halbtc8821c2ant_specific_packet_notify(btcoexist, type)
 #define	ex_halbtc8821c2ant_bt_info_notify(btcoexist, tmp_buf, length)
+#define	ex_halbtc8821c2ant_wl_fwdbginfo_notify(btcoexist, tmp_buf, length)
+#define	ex_halbtc8821c2ant_rx_rate_change_notify(btcoexist, is_data_frame, btc_rate_id)
 #define	ex_halbtc8821c2ant_rf_status_notify(btcoexist, type)
 #define	ex_halbtc8821c2ant_halt_notify(btcoexist)
 #define	ex_halbtc8821c2ant_pnp_notify(btcoexist, pnp_state)
 #define	ex_halbtc8821c2ant_periodical(btcoexist)
+#define	ex_halbtc8821c2ant_display_simple_coex_info(btcoexist)
 #define	ex_halbtc8821c2ant_display_coex_info(btcoexist)
 #define	ex_halbtc8821c2ant_display_ant_detection(btcoexist)
 #define	ex_halbtc8821c2ant_antenna_detection(btcoexist, cent_freq, offset, span, seconds)

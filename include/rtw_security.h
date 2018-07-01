@@ -1,6 +1,6 @@
 /******************************************************************************
  *
- * Copyright(c) 2007 - 2011 Realtek Corporation. All rights reserved.
+ * Copyright(c) 2007 - 2017 Realtek Corporation.
  *
  * This program is free software; you can redistribute it and/or modify it
  * under the terms of version 2 of the GNU General Public License as
@@ -11,12 +11,7 @@
  * FITNESS FOR A PARTICULAR PURPOSE. See the GNU General Public License for
  * more details.
  *
- * You should have received a copy of the GNU General Public License along with
- * this program; if not, write to the Free Software Foundation, Inc.,
- * 51 Franklin Street, Fifth Floor, Boston, MA 02110, USA
- *
- *
- ******************************************************************************/
+ *****************************************************************************/
 #ifndef __RTW_SECURITY_H_
 #define __RTW_SECURITY_H_
 
@@ -36,6 +31,9 @@
 #define IEEE80211W_RIGHT_KEY	0x0
 #define IEEE80211W_WRONG_KEY	0x1
 #define IEEE80211W_NO_KEY		0x2
+
+#define CCMPH_2_PN(ch)	((ch) & 0x000000000000ffff) \
+			| (((ch) & 0xffffffff00000000) >> 16)
 
 #define is_wep_enc(alg) (((alg) == _WEP40_) || ((alg) == _WEP104_))
 
@@ -203,10 +201,10 @@ struct security_priv {
 
 
 	/* for tkip countermeasure */
-	u32 last_mic_err_time;
+	systime last_mic_err_time;
 	u8	btkip_countermeasure;
 	u8	btkip_wait_report;
-	u32 btkip_countermeasure_time;
+	systime btkip_countermeasure_time;
 
 	/* --------------------------------------------------------------------------- */
 	/* For WPA2 Pre-Authentication. */
@@ -243,7 +241,6 @@ struct security_priv {
 	u64 aes_sw_dec_cnt_mc;
 	u64 aes_sw_dec_cnt_uc;
 #endif /* DBG_SW_SEC_CNT */
-	int set_security_ret;
 };
 
 struct sha256_state {
@@ -406,11 +403,6 @@ static inline u32 rotr(u32 val, int bits)
 		(a)[6] = (u8) (((u64) (val)) >> 8);	\
 		(a)[7] = (u8) (((u64) (val)) & 0xff);	\
 	} while (0)
-
-/* ===== start - public domain SHA256 implementation ===== */
-
-/* This is based on SHA256 implementation in LibTomCrypt that was released into
- * public domain by Tom St Denis. */
 
 /* the K array */
 static const unsigned long K[64] = {

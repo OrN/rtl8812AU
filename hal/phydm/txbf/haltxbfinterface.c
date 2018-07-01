@@ -1,3 +1,17 @@
+/******************************************************************************
+ *
+ * Copyright(c) 2016 - 2017 Realtek Corporation.
+ *
+ * This program is free software; you can redistribute it and/or modify it
+ * under the terms of version 2 of the GNU General Public License as
+ * published by the Free Software Foundation.
+ *
+ * This program is distributed in the hope that it will be useful, but WITHOUT
+ * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
+ * FITNESS FOR A PARTICULAR PURPOSE. See the GNU General Public License for
+ * more details.
+ *
+ *****************************************************************************/
 /* ************************************************************
  * Description:
  *
@@ -15,12 +29,11 @@ beamforming_gid_paid(
 	PRT_TCB		p_tcb
 )
 {
-	u8		idx = 0;
 	u8		RA[6] = {0};
 	u8		*p_header = GET_FRAME_OF_FIRST_FRAG(adapter, p_tcb);
 	HAL_DATA_TYPE			*p_hal_data = GET_HAL_DATA(adapter);
-	struct PHY_DM_STRUCT				*p_dm_odm = &p_hal_data->DM_OutSrc;
-	struct _RT_BEAMFORMING_INFO	*p_beam_info = &(p_dm_odm->beamforming_info);
+	struct PHY_DM_STRUCT				*p_dm = &p_hal_data->DM_OutSrc;
+	struct _RT_BEAMFORMING_INFO	*p_beam_info = &(p_dm->beamforming_info);
 
 	if (adapter->HardwareType < HARDWARE_TYPE_RTL8192EE)
 		return;
@@ -86,19 +99,19 @@ beamforming_get_report_frame(
 )
 {
 	HAL_DATA_TYPE				*p_hal_data = GET_HAL_DATA(adapter);
-	struct PHY_DM_STRUCT					*p_dm_odm = &p_hal_data->DM_OutSrc;
+	struct PHY_DM_STRUCT					*p_dm = &p_hal_data->DM_OutSrc;
 	struct _RT_BEAMFORMEE_ENTRY		*p_beamform_entry = NULL;
-	u8						*p_mimo_ctrl_field, p_csi_report, p_csi_matrix;
+	u8						*p_mimo_ctrl_field, p_csi_matrix;
 	u8						idx, nc, nr, CH_W;
 	u16						csi_matrix_len = 0;
 
 	ACT_PKT_TYPE				pkt_type = ACT_PKT_TYPE_UNKNOWN;
 
 	/* Memory comparison to see if CSI report is the same with previous one */
-	p_beamform_entry = phydm_beamforming_get_bfee_entry_by_addr(p_dm_odm, Frame_Addr2(*p_pdu_os), &idx);
+	p_beamform_entry = phydm_beamforming_get_bfee_entry_by_addr(p_dm, Frame_Addr2(*p_pdu_os), &idx);
 
 	if (p_beamform_entry == NULL) {
-		ODM_RT_TRACE(p_dm_odm, PHYDM_COMP_TXBF, ODM_DBG_LOUD, ("beamforming_get_report_frame: Cannot find entry by addr\n"));
+		PHYDM_DBG(p_dm, DBG_TXBF, ("beamforming_get_report_frame: Cannot find entry by addr\n"));
 		return RT_STATUS_FAILURE;
 	}
 
@@ -122,7 +135,7 @@ beamforming_get_report_frame(
 	} else
 		return RT_STATUS_SUCCESS;
 
-	ODM_RT_TRACE(p_dm_odm, PHYDM_COMP_TXBF, ODM_DBG_LOUD, ("[%s] idx=%d, pkt type=%d, nc=%d, nr=%d, CH_W=%d\n", __func__, idx, pkt_type, nc, nr, CH_W));
+	PHYDM_DBG(p_dm, DBG_TXBF, ("[%s] idx=%d, pkt type=%d, nc=%d, nr=%d, CH_W=%d\n", __func__, idx, pkt_type, nc, nr, CH_W));
 
 	return RT_STATUS_SUCCESS;
 }
@@ -134,7 +147,7 @@ construct_ht_ndpa_packet(
 	u8			*RA,
 	u8			*buffer,
 	u32			*p_length,
-	CHANNEL_WIDTH	BW
+	enum channel_width	BW
 )
 {
 	u16					duration = 0;
@@ -181,11 +194,11 @@ boolean
 send_fw_ht_ndpa_packet(
 	void			*p_dm_void,
 	u8			*RA,
-	CHANNEL_WIDTH	BW
+	enum channel_width	BW
 )
 {
-	struct PHY_DM_STRUCT				*p_dm_odm = (struct PHY_DM_STRUCT *)p_dm_void;
-	struct _ADAPTER				*adapter = p_dm_odm->adapter;
+	struct PHY_DM_STRUCT				*p_dm = (struct PHY_DM_STRUCT *)p_dm_void;
+	struct _ADAPTER				*adapter = p_dm->adapter;
 	PRT_TCB				p_tcb;
 	PRT_TX_LOCAL_BUFFER	p_buf;
 	boolean				ret = true;
@@ -193,17 +206,16 @@ send_fw_ht_ndpa_packet(
 	u8					*buf_addr;
 	u8					desc_len = 0, idx = 0, ndp_tx_rate;
 	struct _ADAPTER				*p_def_adapter = GetDefaultAdapter(adapter);
-	struct _RT_BEAMFORMING_INFO	*p_beam_info = &p_dm_odm->beamforming_info;
 	HAL_DATA_TYPE			*p_hal_data = GET_HAL_DATA(adapter);
-	struct _RT_BEAMFORMEE_ENTRY	*p_beamform_entry = phydm_beamforming_get_bfee_entry_by_addr(p_dm_odm, RA, &idx);
+	struct _RT_BEAMFORMEE_ENTRY	*p_beamform_entry = phydm_beamforming_get_bfee_entry_by_addr(p_dm, RA, &idx);
 
-	ODM_RT_TRACE(p_dm_odm, PHYDM_COMP_TXBF, ODM_DBG_LOUD, ("[%s] Start!\n", __func__));
+	PHYDM_DBG(p_dm, DBG_TXBF, ("[%s] Start!\n", __func__));
 
 	if (p_beamform_entry == NULL)
 		return false;
 
-	ndp_tx_rate = beamforming_get_htndp_tx_rate(p_dm_odm, p_beamform_entry->comp_steering_num_of_bfer);
-	ODM_RT_TRACE(p_dm_odm, PHYDM_COMP_TXBF, ODM_DBG_LOUD, ("[%s] ndp_tx_rate =%d\n", __func__, ndp_tx_rate));
+	ndp_tx_rate = beamforming_get_htndp_tx_rate(p_dm, p_beamform_entry->comp_steering_num_of_bfer);
+	PHYDM_DBG(p_dm, DBG_TXBF, ("[%s] ndp_tx_rate =%d\n", __func__, ndp_tx_rate));
 	PlatformAcquireSpinLock(adapter, RT_TX_SPINLOCK);
 
 	if (MgntGetFWBuffer(p_def_adapter, &p_tcb, &p_buf)) {
@@ -249,22 +261,21 @@ boolean
 send_sw_ht_ndpa_packet(
 	void			*p_dm_void,
 	u8			*RA,
-	CHANNEL_WIDTH	BW
+	enum channel_width	BW
 )
 {
-	struct PHY_DM_STRUCT				*p_dm_odm = (struct PHY_DM_STRUCT *)p_dm_void;
-	struct _ADAPTER				*adapter = p_dm_odm->adapter;
+	struct PHY_DM_STRUCT				*p_dm = (struct PHY_DM_STRUCT *)p_dm_void;
+	struct _ADAPTER				*adapter = p_dm->adapter;
 	PRT_TCB					p_tcb;
 	PRT_TX_LOCAL_BUFFER		p_buf;
 	boolean					ret = true;
 	u8					idx = 0, ndp_tx_rate = 0;
-	struct _RT_BEAMFORMING_INFO	*p_beam_info = &p_dm_odm->beamforming_info;
-	struct _RT_BEAMFORMEE_ENTRY	*p_beamform_entry = phydm_beamforming_get_bfee_entry_by_addr(p_dm_odm, RA, &idx);
+	struct _RT_BEAMFORMEE_ENTRY	*p_beamform_entry = phydm_beamforming_get_bfee_entry_by_addr(p_dm, RA, &idx);
 
-	ODM_RT_TRACE(p_dm_odm, PHYDM_COMP_TXBF, ODM_DBG_LOUD, ("[%s] Start!\n", __func__));
+	PHYDM_DBG(p_dm, DBG_TXBF, ("[%s] Start!\n", __func__));
 
-	ndp_tx_rate = beamforming_get_htndp_tx_rate(p_dm_odm, p_beamform_entry->comp_steering_num_of_bfer);
-	ODM_RT_TRACE(p_dm_odm, PHYDM_COMP_TXBF, ODM_DBG_LOUD, ("[%s] ndp_tx_rate =%d\n", __func__, ndp_tx_rate));
+	ndp_tx_rate = beamforming_get_htndp_tx_rate(p_dm, p_beamform_entry->comp_steering_num_of_bfer);
+	PHYDM_DBG(p_dm, DBG_TXBF, ("[%s] ndp_tx_rate =%d\n", __func__, ndp_tx_rate));
 
 	PlatformAcquireSpinLock(adapter, RT_TX_SPINLOCK);
 
@@ -297,21 +308,21 @@ send_sw_ht_ndpa_packet(
 
 void
 construct_vht_ndpa_packet(
-	struct PHY_DM_STRUCT	*p_dm_odm,
+	struct PHY_DM_STRUCT	*p_dm,
 	u8			*RA,
 	u16			AID,
 	u8			*buffer,
 	u32			*p_length,
-	CHANNEL_WIDTH	BW
+	enum channel_width	BW
 )
 {
 	u16					duration = 0;
 	u8					sequence = 0;
 	u8					*p_ndpa_frame = buffer;
 	struct _RT_NDPA_STA_INFO		sta_info;
-	struct _ADAPTER				*adapter = p_dm_odm->adapter;
+	struct _ADAPTER				*adapter = p_dm->adapter;
 	u8	idx = 0;
-	struct _RT_BEAMFORMEE_ENTRY	*p_beamform_entry = phydm_beamforming_get_bfee_entry_by_addr(p_dm_odm, RA, &idx);
+	struct _RT_BEAMFORMEE_ENTRY	*p_beamform_entry = phydm_beamforming_get_bfee_entry_by_addr(p_dm, RA, &idx);
 	/* Frame control. */
 	SET_80211_HDR_FRAME_CONTROL(p_ndpa_frame, 0);
 	SET_80211_HDR_TYPE_AND_SUBTYPE(p_ndpa_frame, Type_NDPA);
@@ -330,17 +341,17 @@ construct_vht_ndpa_packet(
 
 	SET_80211_HDR_DURATION(p_ndpa_frame, duration);
 
-	sequence = *(p_dm_odm->p_sounding_seq) << 2;
-	odm_move_memory(p_dm_odm, p_ndpa_frame + 16, &sequence, 1);
+	sequence = *(p_dm->p_sounding_seq) << 2;
+	odm_move_memory(p_dm, p_ndpa_frame + 16, &sequence, 1);
 
-	if (phydm_acting_determine(p_dm_odm, phydm_acting_as_ibss) || phydm_acting_determine(p_dm_odm, phydm_acting_as_ap) == false)
+	if (phydm_acting_determine(p_dm, phydm_acting_as_ibss) || phydm_acting_determine(p_dm, phydm_acting_as_ap) == false)
 		AID = 0;
 
 	sta_info.aid = AID;
 	sta_info.feedback_type = 0;
 	sta_info.nc_index = 0;
 
-	odm_move_memory(p_dm_odm, p_ndpa_frame + 17, (u8 *)&sta_info, 2);
+	odm_move_memory(p_dm, p_ndpa_frame + 17, (u8 *)&sta_info, 2);
 
 	*p_length = 19;
 }
@@ -351,11 +362,11 @@ send_fw_vht_ndpa_packet(
 	void			*p_dm_void,
 	u8			*RA,
 	u16			AID,
-	CHANNEL_WIDTH	BW
+	enum channel_width	BW
 )
 {
-	struct PHY_DM_STRUCT				*p_dm_odm = (struct PHY_DM_STRUCT *)p_dm_void;
-	struct _ADAPTER				*adapter = p_dm_odm->adapter;
+	struct PHY_DM_STRUCT				*p_dm = (struct PHY_DM_STRUCT *)p_dm_void;
+	struct _ADAPTER				*adapter = p_dm->adapter;
 	PRT_TCB					p_tcb;
 	PRT_TX_LOCAL_BUFFER		p_buf;
 	boolean					ret = true;
@@ -363,17 +374,16 @@ send_fw_vht_ndpa_packet(
 	u8					*buf_addr;
 	u8					desc_len = 0, idx = 0, ndp_tx_rate = 0;
 	struct _ADAPTER				*p_def_adapter = GetDefaultAdapter(adapter);
-	struct _RT_BEAMFORMING_INFO	*p_beam_info = &p_dm_odm->beamforming_info;
 	HAL_DATA_TYPE			*p_hal_data = GET_HAL_DATA(adapter);
-	struct _RT_BEAMFORMEE_ENTRY	*p_beamform_entry = phydm_beamforming_get_bfee_entry_by_addr(p_dm_odm, RA, &idx);
+	struct _RT_BEAMFORMEE_ENTRY	*p_beamform_entry = phydm_beamforming_get_bfee_entry_by_addr(p_dm, RA, &idx);
 
-	ODM_RT_TRACE(p_dm_odm, PHYDM_COMP_TXBF, ODM_DBG_LOUD, ("[%s] Start!\n", __func__));
+	PHYDM_DBG(p_dm, DBG_TXBF, ("[%s] Start!\n", __func__));
 
 	if (p_beamform_entry == NULL)
 		return false;
 
-	ndp_tx_rate = beamforming_get_vht_ndp_tx_rate(p_dm_odm, p_beamform_entry->comp_steering_num_of_bfer);
-	ODM_RT_TRACE(p_dm_odm, PHYDM_COMP_TXBF, ODM_DBG_LOUD, ("[%s] ndp_tx_rate =%d\n", __func__, ndp_tx_rate));
+	ndp_tx_rate = beamforming_get_vht_ndp_tx_rate(p_dm, p_beamform_entry->comp_steering_num_of_bfer);
+	PHYDM_DBG(p_dm, DBG_TXBF, ("[%s] ndp_tx_rate =%d\n", __func__, ndp_tx_rate));
 
 	PlatformAcquireSpinLock(adapter, RT_TX_SPINLOCK);
 
@@ -384,7 +394,7 @@ send_fw_vht_ndpa_packet(
 		buf_addr = p_buf->Buffer.VirtualAddress + desc_len;
 
 		construct_vht_ndpa_packet(
-			p_dm_odm,
+			p_dm,
 			RA,
 			AID,
 			buf_addr,
@@ -398,7 +408,7 @@ send_fw_vht_ndpa_packet(
 
 		p_tcb->BWOfPacket = BW;
 
-		if (phydm_acting_determine(p_dm_odm, phydm_acting_as_ibss) || phydm_acting_determine(p_dm_odm, phydm_acting_as_ap))
+		if (phydm_acting_determine(p_dm, phydm_acting_as_ibss) || phydm_acting_determine(p_dm, phydm_acting_as_ap))
 			p_tcb->G_ID = 63;
 
 		p_tcb->P_AID = p_beamform_entry->p_aid;
@@ -410,7 +420,7 @@ send_fw_vht_ndpa_packet(
 
 	PlatformReleaseSpinLock(adapter, RT_TX_SPINLOCK);
 
-	ODM_RT_TRACE(p_dm_odm, PHYDM_COMP_TXBF, ODM_DBG_LOUD, ("[%s] End, ret=%d\n", __func__, ret));
+	PHYDM_DBG(p_dm, DBG_TXBF, ("[%s] End, ret=%d\n", __func__, ret));
 
 	if (ret)
 		RT_DISP_DATA(FBEAM, FBEAM_DATA, "", p_buf->Buffer.VirtualAddress, p_tcb->PacketLength);
@@ -425,26 +435,25 @@ send_sw_vht_ndpa_packet(
 	void			*p_dm_void,
 	u8			*RA,
 	u16			AID,
-	CHANNEL_WIDTH	BW
+	enum channel_width	BW
 )
 {
-	struct PHY_DM_STRUCT				*p_dm_odm = (struct PHY_DM_STRUCT *)p_dm_void;
-	struct _ADAPTER				*adapter = p_dm_odm->adapter;
+	struct PHY_DM_STRUCT				*p_dm = (struct PHY_DM_STRUCT *)p_dm_void;
+	struct _ADAPTER				*adapter = p_dm->adapter;
 	PRT_TCB					p_tcb;
 	PRT_TX_LOCAL_BUFFER		p_buf;
 	boolean					ret = true;
 	u8					idx = 0, ndp_tx_rate = 0;
-	struct _RT_BEAMFORMING_INFO	*p_beam_info = &(p_dm_odm->beamforming_info);
-	struct _RT_BEAMFORMEE_ENTRY	*p_beamform_entry = phydm_beamforming_get_bfee_entry_by_addr(p_dm_odm, RA, &idx);
+	struct _RT_BEAMFORMEE_ENTRY	*p_beamform_entry = phydm_beamforming_get_bfee_entry_by_addr(p_dm, RA, &idx);
 
-	ndp_tx_rate = beamforming_get_vht_ndp_tx_rate(p_dm_odm, p_beamform_entry->comp_steering_num_of_bfer);
-	ODM_RT_TRACE(p_dm_odm, PHYDM_COMP_TXBF, ODM_DBG_LOUD, ("[%s] ndp_tx_rate =%d\n", __func__, ndp_tx_rate));
+	ndp_tx_rate = beamforming_get_vht_ndp_tx_rate(p_dm, p_beamform_entry->comp_steering_num_of_bfer);
+	PHYDM_DBG(p_dm, DBG_TXBF, ("[%s] ndp_tx_rate =%d\n", __func__, ndp_tx_rate));
 
 	PlatformAcquireSpinLock(adapter, RT_TX_SPINLOCK);
 
 	if (MgntGetBuffer(adapter, &p_tcb, &p_buf)) {
 		construct_vht_ndpa_packet(
-			p_dm_odm,
+			p_dm,
 			RA,
 			AID,
 			p_buf->Buffer.VirtualAddress,
@@ -483,27 +492,27 @@ beamforming_get_vht_gid_mgnt_frame(
 )
 {
 	HAL_DATA_TYPE	*p_hal_data = GET_HAL_DATA(adapter);
-	struct PHY_DM_STRUCT		*p_dm_odm = &p_hal_data->DM_OutSrc;
+	struct PHY_DM_STRUCT		*p_dm = &p_hal_data->DM_OutSrc;
 	enum rt_status		rt_status = RT_STATUS_SUCCESS;
 	u8			*p_buffer = NULL;
 	u8			*p_raddr = NULL;
 	u8			mem_status[8] = {0}, user_pos[16] = {0};
 	u8			idx;
-	struct _RT_BEAMFORMING_INFO	*p_beam_info = &(p_dm_odm->beamforming_info);
+	struct _RT_BEAMFORMING_INFO	*p_beam_info = &(p_dm->beamforming_info);
 	struct _RT_BEAMFORMER_ENTRY	*p_beamform_entry = &p_beam_info->beamformer_entry[p_beam_info->mu_ap_index];
 
-	ODM_RT_TRACE(p_dm_odm, PHYDM_COMP_TXBF, ODM_DBG_LOUD, ("[%s] On VHT GID mgnt frame!\n", __func__));
+	PHYDM_DBG(p_dm, DBG_TXBF, ("[%s] On VHT GID mgnt frame!\n", __func__));
 
 	/* Check length*/
 	if (p_pdu_os->length < (FRAME_OFFSET_VHT_GID_MGNT_USER_POSITION_ARRAY + 16)) {
-		ODM_RT_TRACE(p_dm_odm, PHYDM_COMP_TXBF, ODM_DBG_LOUD, ("beamforming_get_vht_gid_mgnt_frame(): Invalid length (%d)\n", p_pdu_os->length));
+		PHYDM_DBG(p_dm, DBG_TXBF, ("beamforming_get_vht_gid_mgnt_frame(): Invalid length (%d)\n", p_pdu_os->length));
 		return RT_STATUS_INVALID_LENGTH;
 	}
 
 	/* Check RA*/
 	p_raddr = (u8 *)(p_pdu_os->Octet) + 4;
 	if (!eq_mac_addr(p_raddr, adapter->CurrentAddress)) {
-		ODM_RT_TRACE(p_dm_odm, PHYDM_COMP_TXBF, ODM_DBG_LOUD, ("beamforming_get_vht_gid_mgnt_frame(): Drop because of RA error.\n"));
+		PHYDM_DBG(p_dm, DBG_TXBF, ("beamforming_get_vht_gid_mgnt_frame(): Drop because of RA error.\n"));
 		return RT_STATUS_PKT_DROP;
 	}
 
@@ -538,7 +547,7 @@ beamforming_get_vht_gid_mgnt_frame(
 			tmp_val2 = ((user_pos[i * 2 + 1] << 8) & 0xFF00) + (user_pos[i * 2] & 0xFF);
 			for (j = 0; j < 8; j++) {
 				if ((tmp_val >> j) & BIT(0)) {
-					ODM_RT_TRACE(p_dm_odm, PHYDM_COMP_TXBF, ODM_DBG_LOUD, ("Use Group ID (%d), User Position (%d)\n",
+					PHYDM_DBG(p_dm, DBG_TXBF, ("Use Group ID (%d), User Position (%d)\n",
 						(i * 8 + j), (tmp_val2 >> 2 * j) & 0x3));
 				}
 			}
@@ -564,7 +573,7 @@ beamforming_get_vht_gid_mgnt_frame(
 	}
 
 	/* Config HW GID table */
-	hal_com_txbf_config_gtab(p_dm_odm);
+	hal_com_txbf_config_gtab(p_dm);
 
 	return rt_status;
 }
@@ -576,7 +585,7 @@ beamforming_get_vht_gid_mgnt_frame(
  */
 void
 construct_vht_gid_mgnt_frame(
-	struct PHY_DM_STRUCT		*p_dm_odm,
+	struct PHY_DM_STRUCT		*p_dm,
 	u8			*RA,
 	struct _RT_BEAMFORMEE_ENTRY	*p_beamform_entry,
 	u8			*buffer,
@@ -584,7 +593,7 @@ construct_vht_gid_mgnt_frame(
 
 )
 {
-	struct _RT_BEAMFORMING_INFO	*p_beam_info = &(p_dm_odm->beamforming_info);
+	struct _RT_BEAMFORMING_INFO	*p_beam_info = &(p_dm->beamforming_info);
 	struct _ADAPTER				*adapter = p_beam_info->source_adapter;
 	OCTET_STRING		os_ftm_frame, tmp;
 
@@ -618,22 +627,22 @@ send_sw_vht_gid_mgnt_frame(
 	u8			idx
 )
 {
-	struct PHY_DM_STRUCT				*p_dm_odm = (struct PHY_DM_STRUCT *)p_dm_void;
+	struct PHY_DM_STRUCT				*p_dm = (struct PHY_DM_STRUCT *)p_dm_void;
 	PRT_TCB					p_tcb;
 	PRT_TX_LOCAL_BUFFER		p_buf;
 	boolean					ret = true;
 	u8					data_rate = 0;
-	struct _RT_BEAMFORMING_INFO	*p_beam_info = &(p_dm_odm->beamforming_info);
+	struct _RT_BEAMFORMING_INFO	*p_beam_info = &(p_dm->beamforming_info);
 	struct _RT_BEAMFORMEE_ENTRY	*p_beamform_entry = &p_beam_info->beamformee_entry[idx];
 	struct _ADAPTER				*adapter = p_beam_info->source_adapter;
 
-	ODM_RT_TRACE(p_dm_odm, PHYDM_COMP_TXBF, ODM_DBG_LOUD, ("[%s] Start!\n", __func__));
+	PHYDM_DBG(p_dm, DBG_TXBF, ("[%s] Start!\n", __func__));
 
 	PlatformAcquireSpinLock(adapter, RT_TX_SPINLOCK);
 
 	if (MgntGetBuffer(adapter, &p_tcb, &p_buf)) {
 		construct_vht_gid_mgnt_frame(
-			p_dm_odm,
+			p_dm,
 			RA,
 			p_beamform_entry,
 			p_buf->Buffer.VirtualAddress,
@@ -662,13 +671,13 @@ send_sw_vht_gid_mgnt_frame(
  */
 void
 construct_vht_bf_report_poll(
-	struct PHY_DM_STRUCT		*p_dm_odm,
+	struct PHY_DM_STRUCT		*p_dm,
 	u8			*RA,
 	u8			*buffer,
 	u32			*p_length
 )
 {
-	struct _RT_BEAMFORMING_INFO	*p_beam_info = &(p_dm_odm->beamforming_info);
+	struct _RT_BEAMFORMING_INFO	*p_beam_info = &(p_dm->beamforming_info);
 	struct _ADAPTER				*adapter = p_beam_info->source_adapter;
 	u8			*p_bf_rpt_poll = buffer;
 
@@ -701,22 +710,22 @@ send_sw_vht_bf_report_poll(
 	boolean			is_final_poll
 )
 {
-	struct PHY_DM_STRUCT				*p_dm_odm = (struct PHY_DM_STRUCT *)p_dm_void;
+	struct PHY_DM_STRUCT				*p_dm = (struct PHY_DM_STRUCT *)p_dm_void;
 	PRT_TCB					p_tcb;
 	PRT_TX_LOCAL_BUFFER		p_buf;
 	boolean					ret = true;
 	u8					idx = 0, data_rate = 0;
-	struct _RT_BEAMFORMING_INFO	*p_beam_info = &(p_dm_odm->beamforming_info);
-	struct _RT_BEAMFORMEE_ENTRY	*p_beamform_entry = phydm_beamforming_get_bfee_entry_by_addr(p_dm_odm, RA, &idx);
+	struct _RT_BEAMFORMING_INFO	*p_beam_info = &(p_dm->beamforming_info);
+	struct _RT_BEAMFORMEE_ENTRY	*p_beamform_entry = phydm_beamforming_get_bfee_entry_by_addr(p_dm, RA, &idx);
 	struct _ADAPTER				*adapter = p_beam_info->source_adapter;
 
-	ODM_RT_TRACE(p_dm_odm, PHYDM_COMP_TXBF, ODM_DBG_LOUD, ("[%s] Start!\n", __func__));
+	PHYDM_DBG(p_dm, DBG_TXBF, ("[%s] Start!\n", __func__));
 
 	PlatformAcquireSpinLock(adapter, RT_TX_SPINLOCK);
 
 	if (MgntGetBuffer(adapter, &p_tcb, &p_buf)) {
 		construct_vht_bf_report_poll(
-			p_dm_odm,
+			p_dm,
 			RA,
 			p_buf->Buffer.VirtualAddress,
 			&p_tcb->PacketLength
@@ -753,13 +762,13 @@ send_sw_vht_bf_report_poll(
  */
 void
 construct_vht_mu_ndpa_packet(
-	struct PHY_DM_STRUCT		*p_dm_odm,
-	CHANNEL_WIDTH	BW,
+	struct PHY_DM_STRUCT		*p_dm,
+	enum channel_width	BW,
 	u8			*buffer,
 	u32			*p_length
 )
 {
-	struct _RT_BEAMFORMING_INFO	*p_beam_info = &(p_dm_odm->beamforming_info);
+	struct _RT_BEAMFORMING_INFO	*p_beam_info = &(p_dm->beamforming_info);
 	struct _ADAPTER				*adapter = p_beam_info->source_adapter;
 	u16					duration = 0;
 	u8					sequence = 0;
@@ -802,8 +811,8 @@ construct_vht_mu_ndpa_packet(
 
 	SET_80211_HDR_DURATION(p_ndpa_frame, duration);
 
-	sequence = *(p_dm_odm->p_sounding_seq) << 2;
-	odm_move_memory(p_dm_odm, p_ndpa_frame + 16, &sequence, 1);
+	sequence = *(p_dm->p_sounding_seq) << 2;
+	odm_move_memory(p_dm, p_ndpa_frame + 16, &sequence, 1);
 
 	*p_length = 17;
 
@@ -815,9 +824,9 @@ construct_vht_mu_ndpa_packet(
 			sta_info.feedback_type = 1; /* 1'b1: MU*/
 			sta_info.nc_index = 0;
 
-			ODM_RT_TRACE(p_dm_odm, PHYDM_COMP_TXBF, ODM_DBG_LOUD, ("[%s] Get beamformee_entry idx(%d), AID =%d\n", __func__, idx, p_entry->AID));
+			PHYDM_DBG(p_dm, DBG_TXBF, ("[%s] Get beamformee_entry idx(%d), AID =%d\n", __func__, idx, p_entry->AID));
 
-			odm_move_memory(p_dm_odm, p_ndpa_frame + (*p_length), (u8 *)&sta_info, 2);
+			odm_move_memory(p_dm, p_ndpa_frame + (*p_length), (u8 *)&sta_info, 2);
 			*p_length += 2;
 		}
 	}
@@ -827,25 +836,25 @@ construct_vht_mu_ndpa_packet(
 boolean
 send_sw_vht_mu_ndpa_packet(
 	void			*p_dm_void,
-	CHANNEL_WIDTH	BW
+	enum channel_width	BW
 )
 {
-	struct PHY_DM_STRUCT				*p_dm_odm = (struct PHY_DM_STRUCT *)p_dm_void;
+	struct PHY_DM_STRUCT				*p_dm = (struct PHY_DM_STRUCT *)p_dm_void;
 	PRT_TCB					p_tcb;
 	PRT_TX_LOCAL_BUFFER		p_buf;
 	boolean					ret = true;
 	u8					ndp_tx_rate = 0;
-	struct _RT_BEAMFORMING_INFO	*p_beam_info = &(p_dm_odm->beamforming_info);
+	struct _RT_BEAMFORMING_INFO	*p_beam_info = &(p_dm->beamforming_info);
 	struct _ADAPTER				*adapter = p_beam_info->source_adapter;
 
 	ndp_tx_rate = MGN_VHT2SS_MCS0;
-	ODM_RT_TRACE(p_dm_odm, PHYDM_COMP_TXBF, ODM_DBG_LOUD, ("[%s] ndp_tx_rate =%d\n", __func__, ndp_tx_rate));
+	PHYDM_DBG(p_dm, DBG_TXBF, ("[%s] ndp_tx_rate =%d\n", __func__, ndp_tx_rate));
 
 	PlatformAcquireSpinLock(adapter, RT_TX_SPINLOCK);
 
 	if (MgntGetBuffer(adapter, &p_tcb, &p_buf)) {
 		construct_vht_mu_ndpa_packet(
-			p_dm_odm,
+			p_dm,
 			BW,
 			p_buf->Buffer.VirtualAddress,
 			&p_tcb->PacketLength
@@ -871,13 +880,13 @@ send_sw_vht_mu_ndpa_packet(
 
 void
 dbg_construct_vht_mundpa_packet(
-	struct PHY_DM_STRUCT		*p_dm_odm,
-	CHANNEL_WIDTH	BW,
+	struct PHY_DM_STRUCT		*p_dm,
+	enum channel_width	BW,
 	u8			*buffer,
 	u32			*p_length
 )
 {
-	struct _RT_BEAMFORMING_INFO	*p_beam_info = &(p_dm_odm->beamforming_info);
+	struct _RT_BEAMFORMING_INFO	*p_beam_info = &(p_dm->beamforming_info);
 	struct _ADAPTER				*adapter = p_beam_info->source_adapter;
 	u16					duration = 0;
 	u8					sequence = 0;
@@ -910,7 +919,7 @@ dbg_construct_vht_mundpa_packet(
 	SET_80211_HDR_TYPE_AND_SUBTYPE(p_ndpa_frame, Type_NDPA);
 
 	SET_80211_HDR_ADDRESS1(p_ndpa_frame, dest_addr);
-	SET_80211_HDR_ADDRESS2(p_ndpa_frame, p_dm_odm->CurrentAddress);
+	SET_80211_HDR_ADDRESS2(p_ndpa_frame, p_dm->CurrentAddress);
 
 	/*--------------------------------------------*/
 	/* <Note> Need to modify "duration" to MU consideration. */
@@ -926,8 +935,8 @@ dbg_construct_vht_mundpa_packet(
 
 	SET_80211_HDR_DURATION(p_ndpa_frame, duration);
 
-	sequence = *(p_dm_odm->p_sounding_seq) << 2;
-	odm_move_memory(p_dm_odm, p_ndpa_frame + 16, &sequence, 1);
+	sequence = *(p_dm->p_sounding_seq) << 2;
+	odm_move_memory(p_dm, p_ndpa_frame + 16, &sequence, 1);
 
 	*p_length = 17;
 
@@ -936,9 +945,9 @@ dbg_construct_vht_mundpa_packet(
 	sta_info.feedback_type = 1; /* 1'b1: MU */
 	sta_info.nc_index = 0;
 
-	ODM_RT_TRACE(p_dm_odm, PHYDM_COMP_TXBF, ODM_DBG_LOUD, ("[%s] Get beamformee_entry idx(%d), AID =%d\n", __func__, idx, p_entry->aid));
+	PHYDM_DBG(p_dm, DBG_TXBF, ("[%s] Get beamformee_entry idx(%d), AID =%d\n", __func__, idx, p_entry->aid));
 
-	odm_move_memory(p_dm_odm, p_ndpa_frame + (*p_length), (u8 *)&sta_info, 2);
+	odm_move_memory(p_dm, p_ndpa_frame + (*p_length), (u8 *)&sta_info, 2);
 	*p_length += 2;
 
 }
@@ -946,25 +955,25 @@ dbg_construct_vht_mundpa_packet(
 boolean
 dbg_send_sw_vht_mundpa_packet(
 	void			*p_dm_void,
-	CHANNEL_WIDTH	BW
+	enum channel_width	BW
 )
 {
-	struct PHY_DM_STRUCT				*p_dm_odm = (struct PHY_DM_STRUCT *)p_dm_void;
+	struct PHY_DM_STRUCT				*p_dm = (struct PHY_DM_STRUCT *)p_dm_void;
 	PRT_TCB					p_tcb;
 	PRT_TX_LOCAL_BUFFER		p_buf;
 	boolean					ret = true;
 	u8					ndp_tx_rate = 0;
-	struct _RT_BEAMFORMING_INFO	*p_beam_info = &(p_dm_odm->beamforming_info);
+	struct _RT_BEAMFORMING_INFO	*p_beam_info = &(p_dm->beamforming_info);
 	struct _ADAPTER				*adapter = p_beam_info->source_adapter;
 
 	ndp_tx_rate = MGN_VHT2SS_MCS0;
-	ODM_RT_TRACE(p_dm_odm, PHYDM_COMP_TXBF, ODM_DBG_LOUD, ("[%s] ndp_tx_rate =%d\n", __func__, ndp_tx_rate));
+	PHYDM_DBG(p_dm, DBG_TXBF, ("[%s] ndp_tx_rate =%d\n", __func__, ndp_tx_rate));
 
 	PlatformAcquireSpinLock(adapter, RT_TX_SPINLOCK);
 
 	if (MgntGetBuffer(adapter, &p_tcb, &p_buf)) {
 		dbg_construct_vht_mundpa_packet(
-			p_dm_odm,
+			p_dm,
 			BW,
 			p_buf->Buffer.VirtualAddress,
 			&p_tcb->PacketLength
@@ -1000,7 +1009,7 @@ beamforming_get_report_frame(
 	union recv_frame *precv_frame
 )
 {
-	struct PHY_DM_STRUCT				*p_dm_odm = (struct PHY_DM_STRUCT *)p_dm_void;
+	struct PHY_DM_STRUCT				*p_dm = (struct PHY_DM_STRUCT *)p_dm_void;
 	u32					ret = _SUCCESS;
 	struct _RT_BEAMFORMEE_ENTRY	*p_beamform_entry = NULL;
 	u8					*pframe = precv_frame->u.hdr.rx_data;
@@ -1011,7 +1020,7 @@ beamforming_get_report_frame(
 
 	/*Memory comparison to see if CSI report is the same with previous one*/
 	TA = get_addr2_ptr(pframe);
-	p_beamform_entry = phydm_beamforming_get_bfee_entry_by_addr(p_dm_odm, TA, &idx);
+	p_beamform_entry = phydm_beamforming_get_bfee_entry_by_addr(p_dm, TA, &idx);
 	if (p_beamform_entry->beamform_entry_cap & BEAMFORMER_CAP_VHT_SU)
 		offset = 31;		/*24+(1+1+3)+2  MAC header+(Category+ActionCode+MIMOControlField)+SNR(nc=2)*/
 	else if (p_beamform_entry->beamform_entry_cap & BEAMFORMER_CAP_HT_EXPLICIT)
@@ -1028,11 +1037,11 @@ boolean
 send_fw_ht_ndpa_packet(
 	void			*p_dm_void,
 	u8			*RA,
-	CHANNEL_WIDTH	BW
+	enum channel_width	BW
 )
 {
-	struct PHY_DM_STRUCT				*p_dm_odm = (struct PHY_DM_STRUCT *)p_dm_void;
-	struct _ADAPTER				*adapter = p_dm_odm->adapter;
+	struct PHY_DM_STRUCT				*p_dm = (struct PHY_DM_STRUCT *)p_dm_void;
+	struct _ADAPTER				*adapter = p_dm->adapter;
 	struct xmit_frame		*pmgntframe;
 	struct pkt_attrib		*pattrib;
 	struct rtw_ieee80211_hdr	*pwlanhdr;
@@ -1044,14 +1053,14 @@ send_fw_ht_ndpa_packet(
 	u16	*fctrl;
 	u16	duration = 0;
 	u8	a_sifs_time = 0, ndp_tx_rate = 0, idx = 0;
-	struct _RT_BEAMFORMING_INFO	*p_beam_info = &(p_dm_odm->beamforming_info);
-	struct _RT_BEAMFORMEE_ENTRY	*p_beamform_entry = phydm_beamforming_get_bfee_entry_by_addr(p_dm_odm, RA, &idx);
+	struct _RT_BEAMFORMING_INFO	*p_beam_info = &(p_dm->beamforming_info);
+	struct _RT_BEAMFORMEE_ENTRY	*p_beamform_entry = phydm_beamforming_get_bfee_entry_by_addr(p_dm, RA, &idx);
 
 	pmgntframe = alloc_mgtxmitframe(pxmitpriv);
 
 	if (pmgntframe == NULL) {
-		ODM_RT_TRACE(p_dm_odm, PHYDM_COMP_TXBF, ODM_DBG_LOUD, ("%s, alloc mgnt frame fail\n", __func__));
-		return _FALSE;
+		PHYDM_DBG(p_dm, DBG_TXBF, ("%s, alloc mgnt frame fail\n", __func__));
+		return false;
 	}
 
 	/* update attribute */
@@ -1059,8 +1068,8 @@ send_fw_ht_ndpa_packet(
 	update_mgntframe_attrib(adapter, pattrib);
 
 	pattrib->qsel = QSLT_BEACON;
-	ndp_tx_rate = beamforming_get_htndp_tx_rate(p_dm_odm, p_beamform_entry->comp_steering_num_of_bfer);
-	ODM_RT_TRACE(p_dm_odm, PHYDM_COMP_TXBF, ODM_DBG_LOUD, ("[%s] ndp_tx_rate =%d\n", __func__, ndp_tx_rate));
+	ndp_tx_rate = beamforming_get_htndp_tx_rate(p_dm, p_beamform_entry->comp_steering_num_of_bfer);
+	PHYDM_DBG(p_dm, DBG_TXBF, ("[%s] ndp_tx_rate =%d\n", __func__, ndp_tx_rate));
 	pattrib->rate = ndp_tx_rate;
 	pattrib->bwmode = BW;
 	pattrib->order = 1;
@@ -1108,7 +1117,7 @@ send_fw_ht_ndpa_packet(
 
 	dump_mgntframe(adapter, pmgntframe);
 
-	return _TRUE;
+	return true;
 }
 
 
@@ -1116,11 +1125,11 @@ boolean
 send_sw_ht_ndpa_packet(
 	void			*p_dm_void,
 	u8			*RA,
-	CHANNEL_WIDTH	BW
+	enum channel_width	BW
 )
 {
-	struct PHY_DM_STRUCT				*p_dm_odm = (struct PHY_DM_STRUCT *)p_dm_void;
-	struct _ADAPTER				*adapter = p_dm_odm->adapter;
+	struct PHY_DM_STRUCT				*p_dm = (struct PHY_DM_STRUCT *)p_dm_void;
+	struct _ADAPTER				*adapter = p_dm->adapter;
 	struct xmit_frame		*pmgntframe;
 	struct pkt_attrib		*pattrib;
 	struct rtw_ieee80211_hdr	*pwlanhdr;
@@ -1132,16 +1141,16 @@ send_sw_ht_ndpa_packet(
 	u16	*fctrl;
 	u16	duration = 0;
 	u8	a_sifs_time = 0, ndp_tx_rate = 0, idx = 0;
-	struct _RT_BEAMFORMING_INFO	*p_beam_info = &(p_dm_odm->beamforming_info);
-	struct _RT_BEAMFORMEE_ENTRY	*p_beamform_entry = phydm_beamforming_get_bfee_entry_by_addr(p_dm_odm, RA, &idx);
+	struct _RT_BEAMFORMING_INFO	*p_beam_info = &(p_dm->beamforming_info);
+	struct _RT_BEAMFORMEE_ENTRY	*p_beamform_entry = phydm_beamforming_get_bfee_entry_by_addr(p_dm, RA, &idx);
 
-	ndp_tx_rate = beamforming_get_htndp_tx_rate(p_dm_odm, p_beamform_entry->comp_steering_num_of_bfer);
+	ndp_tx_rate = beamforming_get_htndp_tx_rate(p_dm, p_beamform_entry->comp_steering_num_of_bfer);
 
 	pmgntframe = alloc_mgtxmitframe(pxmitpriv);
 
 	if (pmgntframe == NULL) {
-		ODM_RT_TRACE(p_dm_odm, PHYDM_COMP_TXBF, ODM_DBG_LOUD, ("%s, alloc mgnt frame fail\n", __func__));
-		return _FALSE;
+		PHYDM_DBG(p_dm, DBG_TXBF, ("%s, alloc mgnt frame fail\n", __func__));
+		return false;
 	}
 
 	/*update attribute*/
@@ -1195,7 +1204,7 @@ send_sw_ht_ndpa_packet(
 
 	dump_mgntframe(adapter, pmgntframe);
 
-	return _TRUE;
+	return true;
 }
 
 
@@ -1204,11 +1213,11 @@ send_fw_vht_ndpa_packet(
 	void			*p_dm_void,
 	u8			*RA,
 	u16			AID,
-	CHANNEL_WIDTH	BW
+	enum channel_width	BW
 )
 {
-	struct PHY_DM_STRUCT				*p_dm_odm = (struct PHY_DM_STRUCT *)p_dm_void;
-	struct _ADAPTER				*adapter = p_dm_odm->adapter;
+	struct PHY_DM_STRUCT				*p_dm = (struct PHY_DM_STRUCT *)p_dm_void;
+	struct _ADAPTER				*adapter = p_dm->adapter;
 	struct xmit_frame		*pmgntframe;
 	struct pkt_attrib		*pattrib;
 	struct rtw_ieee80211_hdr	*pwlanhdr;
@@ -1220,15 +1229,15 @@ send_fw_vht_ndpa_packet(
 	u16	*fctrl;
 	u16	duration = 0;
 	u8	sequence = 0, a_sifs_time = 0, ndp_tx_rate = 0, idx = 0;
-	struct _RT_BEAMFORMING_INFO	*p_beam_info = &(p_dm_odm->beamforming_info);
-	struct _RT_BEAMFORMEE_ENTRY	*p_beamform_entry = phydm_beamforming_get_bfee_entry_by_addr(p_dm_odm, RA, &idx);
+	struct _RT_BEAMFORMING_INFO	*p_beam_info = &(p_dm->beamforming_info);
+	struct _RT_BEAMFORMEE_ENTRY	*p_beamform_entry = phydm_beamforming_get_bfee_entry_by_addr(p_dm, RA, &idx);
 	struct _RT_NDPA_STA_INFO	sta_info;
 
 	pmgntframe = alloc_mgtxmitframe(pxmitpriv);
 
 	if (pmgntframe == NULL) {
-		ODM_RT_TRACE(p_dm_odm, PHYDM_COMP_TXBF, ODM_DBG_LOUD, ("%s, alloc mgnt frame fail\n", __func__));
-		return _FALSE;
+		PHYDM_DBG(p_dm, DBG_TXBF, ("%s, alloc mgnt frame fail\n", __func__));
+		return false;
 	}
 
 	/* update attribute */
@@ -1237,8 +1246,8 @@ send_fw_vht_ndpa_packet(
 	update_mgntframe_attrib(adapter, pattrib);
 
 	pattrib->qsel = QSLT_BEACON;
-	ndp_tx_rate = beamforming_get_vht_ndp_tx_rate(p_dm_odm, p_beamform_entry->comp_steering_num_of_bfer);
-	ODM_RT_TRACE(p_dm_odm, PHYDM_COMP_TXBF, ODM_DBG_LOUD, ("[%s] ndp_tx_rate =%d\n", __func__, ndp_tx_rate));
+	ndp_tx_rate = beamforming_get_vht_ndp_tx_rate(p_dm, p_beamform_entry->comp_steering_num_of_bfer);
+	PHYDM_DBG(p_dm, DBG_TXBF, ("[%s] ndp_tx_rate =%d\n", __func__, ndp_tx_rate));
 	pattrib->rate = ndp_tx_rate;
 	pattrib->bwmode = BW;
 	pattrib->subtype = WIFI_NDPA;
@@ -1296,7 +1305,7 @@ send_fw_vht_ndpa_packet(
 
 	dump_mgntframe(adapter, pmgntframe);
 
-	return _TRUE;
+	return true;
 }
 
 
@@ -1306,11 +1315,11 @@ send_sw_vht_ndpa_packet(
 	void			*p_dm_void,
 	u8			*RA,
 	u16			AID,
-	CHANNEL_WIDTH	BW
+	enum channel_width	BW
 )
 {
-	struct PHY_DM_STRUCT				*p_dm_odm = (struct PHY_DM_STRUCT *)p_dm_void;
-	struct _ADAPTER				*adapter = p_dm_odm->adapter;
+	struct PHY_DM_STRUCT				*p_dm = (struct PHY_DM_STRUCT *)p_dm_void;
+	struct _ADAPTER				*adapter = p_dm->adapter;
 	struct xmit_frame		*pmgntframe;
 	struct pkt_attrib		*pattrib;
 	struct rtw_ieee80211_hdr	*pwlanhdr;
@@ -1323,17 +1332,17 @@ send_sw_vht_ndpa_packet(
 	u8	*pframe;
 	u16	*fctrl;
 	u16	duration = 0;
-	struct _RT_BEAMFORMING_INFO	*p_beam_info = &(p_dm_odm->beamforming_info);
-	struct _RT_BEAMFORMEE_ENTRY	*p_beamform_entry = phydm_beamforming_get_bfee_entry_by_addr(p_dm_odm, RA, &idx);
+	struct _RT_BEAMFORMING_INFO	*p_beam_info = &(p_dm->beamforming_info);
+	struct _RT_BEAMFORMEE_ENTRY	*p_beamform_entry = phydm_beamforming_get_bfee_entry_by_addr(p_dm, RA, &idx);
 
-	ndp_tx_rate = beamforming_get_vht_ndp_tx_rate(p_dm_odm, p_beamform_entry->comp_steering_num_of_bfer);
-	ODM_RT_TRACE(p_dm_odm, PHYDM_COMP_TXBF, ODM_DBG_LOUD, ("[%s] ndp_tx_rate =%d\n", __func__, ndp_tx_rate));
+	ndp_tx_rate = beamforming_get_vht_ndp_tx_rate(p_dm, p_beamform_entry->comp_steering_num_of_bfer);
+	PHYDM_DBG(p_dm, DBG_TXBF, ("[%s] ndp_tx_rate =%d\n", __func__, ndp_tx_rate));
 
 	pmgntframe = alloc_mgtxmitframe(pxmitpriv);
 
 	if (pmgntframe == NULL) {
-		ODM_RT_TRACE(p_dm_odm, PHYDM_COMP_TXBF, ODM_DBG_LOUD, ("%s, alloc mgnt frame fail\n", __func__));
-		return _FALSE;
+		PHYDM_DBG(p_dm, DBG_TXBF, ("%s, alloc mgnt frame fail\n", __func__));
+		return false;
 	}
 
 	/*update attribute*/
@@ -1396,9 +1405,9 @@ send_sw_vht_ndpa_packet(
 	pattrib->last_txcmdsz = pattrib->pktlen;
 
 	dump_mgntframe(adapter, pmgntframe);
-	ODM_RT_TRACE(p_dm_odm, PHYDM_COMP_TXBF, ODM_DBG_LOUD, ("[%s] [%d]\n", __func__, __LINE__));
+	PHYDM_DBG(p_dm, DBG_TXBF, ("[%s] [%d]\n", __func__, __LINE__));
 
-	return _TRUE;
+	return true;
 }
 
 
@@ -1415,8 +1424,7 @@ beamforming_get_ndpa_frame(
 #endif
 )
 {
-	struct PHY_DM_STRUCT					*p_dm_odm = (struct PHY_DM_STRUCT *)p_dm_void;
-	struct _ADAPTER					*adapter = p_dm_odm->adapter;
+	struct PHY_DM_STRUCT					*p_dm = (struct PHY_DM_STRUCT *)p_dm_void;
 	u8						*TA ;
 	u8						idx, sequence;
 #if (DM_ODM_SUPPORT_TYPE == ODM_WIN)
@@ -1434,8 +1442,8 @@ beamforming_get_ndpa_frame(
 	if (get_frame_sub_type(p_ndpa_frame) != WIFI_NDPA)
 #endif
 		return;
-	else if (!(p_dm_odm->support_ic_type & (ODM_RTL8812 | ODM_RTL8821))) {
-		ODM_RT_TRACE(p_dm_odm, PHYDM_COMP_TXBF, ODM_DBG_LOUD, ("[%s] not 8812 or 8821A, return\n", __func__));
+	else if (!(p_dm->support_ic_type & (ODM_RTL8812 | ODM_RTL8821))) {
+		PHYDM_DBG(p_dm, DBG_TXBF, ("[%s] not 8812 or 8821A, return\n", __func__));
 		return;
 	}
 #if (DM_ODM_SUPPORT_TYPE == ODM_WIN)
@@ -1446,7 +1454,7 @@ beamforming_get_ndpa_frame(
 	/*Remove signaling TA. */
 	TA[0] = TA[0] & 0xFE;
 
-	p_beamformer_entry = phydm_beamforming_get_bfer_entry_by_addr(p_dm_odm, TA, &idx);		/* Modified By Jeffery @2014-10-29 */
+	p_beamformer_entry = phydm_beamforming_get_bfer_entry_by_addr(p_dm, TA, &idx);		/* Modified By Jeffery @2014-10-29 */
 
 	/*Break options for Clock Reset*/
 	if (p_beamformer_entry == NULL)
@@ -1456,7 +1464,7 @@ beamforming_get_ndpa_frame(
 	/*log_success: As long as 8812A receive NDPA and feedback CSI succeed once, clock reset is NO LONGER needed !2015-04-10, Jeffery*/
 	/*clock_reset_times: While BFer entry always doesn't receive our CSI, clock will reset again and again.So clock_reset_times is limited to 5 times.2015-04-13, Jeffery*/
 	else if ((p_beamformer_entry->log_success == 1) || (p_beamformer_entry->clock_reset_times == 5)) {
-		ODM_RT_TRACE(p_dm_odm, PHYDM_COMP_TXBF, ODM_DBG_LOUD, ("[%s] log_seq=%d, pre_log_seq=%d, log_retry_cnt=%d, log_success=%d, clock_reset_times=%d, clock reset is no longer needed.\n",
+		PHYDM_DBG(p_dm, DBG_TXBF, ("[%s] log_seq=%d, pre_log_seq=%d, log_retry_cnt=%d, log_success=%d, clock_reset_times=%d, clock reset is no longer needed.\n",
 			__func__, p_beamformer_entry->log_seq, p_beamformer_entry->pre_log_seq, p_beamformer_entry->log_retry_cnt, p_beamformer_entry->log_success, p_beamformer_entry->clock_reset_times));
 
 		return;
@@ -1464,7 +1472,7 @@ beamforming_get_ndpa_frame(
 
 	sequence = (p_ndpa_frame[16]) >> 2;
 
-	ODM_RT_TRACE(p_dm_odm, PHYDM_COMP_TXBF, ODM_DBG_LOUD, ("[%s] Start, sequence=%d, log_seq=%d, pre_log_seq=%d, log_retry_cnt=%d, clock_reset_times=%d, log_success=%d\n",
+	PHYDM_DBG(p_dm, DBG_TXBF, ("[%s] Start, sequence=%d, log_seq=%d, pre_log_seq=%d, log_retry_cnt=%d, clock_reset_times=%d, log_success=%d\n",
 		__func__, sequence, p_beamformer_entry->log_seq, p_beamformer_entry->pre_log_seq, p_beamformer_entry->log_retry_cnt, p_beamformer_entry->clock_reset_times, p_beamformer_entry->log_success));
 
 	if ((p_beamformer_entry->log_seq != 0) && (p_beamformer_entry->pre_log_seq != 0)) {
@@ -1482,9 +1490,9 @@ beamforming_get_ndpa_frame(
 				p_beamformer_entry->clock_reset_times++;
 				p_beamformer_entry->log_retry_cnt = 0;
 
-				ODM_RT_TRACE(p_dm_odm, PHYDM_COMP_TXBF, ODM_DBG_LOUD, ("[%s] Clock Reset!!! clock_reset_times=%d\n",
+				PHYDM_DBG(p_dm, DBG_TXBF, ("[%s] Clock Reset!!! clock_reset_times=%d\n",
 					__func__, p_beamformer_entry->clock_reset_times));
-				hal_com_txbf_set(p_dm_odm, TXBF_SET_SOUNDING_CLK, NULL);
+				hal_com_txbf_set(p_dm, TXBF_SET_SOUNDING_CLK, NULL);
 
 			} else
 				p_beamformer_entry->log_retry_cnt++;

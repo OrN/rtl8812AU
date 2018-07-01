@@ -1,6 +1,6 @@
 /******************************************************************************
  *
- * Copyright(c) 2007 - 2011 Realtek Corporation. All rights reserved.
+ * Copyright(c) 2007 - 2017 Realtek Corporation.
  *
  * This program is free software; you can redistribute it and/or modify it
  * under the terms of version 2 of the GNU General Public License as
@@ -11,12 +11,7 @@
  * FITNESS FOR A PARTICULAR PURPOSE. See the GNU General Public License for
  * more details.
  *
- * You should have received a copy of the GNU General Public License along with
- * this program; if not, write to the Free Software Foundation, Inc.,
- * 51 Franklin Street, Fifth Floor, Boston, MA 02110, USA
- *
- *
- ******************************************************************************/
+ *****************************************************************************/
 /* ************************************************************
  * Description:
  *
@@ -61,26 +56,6 @@ dm_CheckProtection(
 #endif
 }
 
-static VOID
-dm_CheckStatistics(
-	IN	PADAPTER	Adapter
-)
-{
-#if 0
-	if (!Adapter->MgntInfo.bMediaConnect)
-		return;
-
-	/* 2008.12.10 tynli Add for getting Current_Tx_Rate_Reg flexibly. */
-	rtw_hal_get_hwreg(Adapter, HW_VAR_INIT_TX_RATE, (pu1Byte)(&Adapter->TxStats.CurrentInitTxRate));
-
-	/* Calculate current Tx Rate(Successful transmited!!) */
-
-	/* Calculate current Rx Rate(Successful received!!) */
-
-	/* for tx tx retry count */
-	rtw_hal_get_hwreg(Adapter, HW_VAR_RETRY_COUNT, (pu1Byte)(&Adapter->TxStats.NumTxRetryCount));
-#endif
-}
 #ifdef CONFIG_SUPPORT_HW_WPS_PBC
 static void dm_CheckPbcGPIO(_adapter *padapter)
 {
@@ -294,7 +269,7 @@ rtl8812_HalDmWatchDog(
 )
 {
 	BOOLEAN		bFwCurrentInPSMode = _FALSE;
-	BOOLEAN		bFwPSAwake = _TRUE;
+	u8 bFwPSAwake = _TRUE;
 	PHAL_DATA_TYPE	pHalData = GET_HAL_DATA(Adapter);
 	struct PHY_DM_STRUCT		*pDM_Odm = &(pHalData->odmpriv);
 
@@ -304,7 +279,7 @@ rtl8812_HalDmWatchDog(
 
 #ifdef CONFIG_LPS
 	bFwCurrentInPSMode = adapter_to_pwrctl(Adapter)->bFwCurrentInPSMode;
-	rtw_hal_get_hwreg(Adapter, HW_VAR_FWLPS_RF_ON, (u8 *)(&bFwPSAwake));
+	rtw_hal_get_hwreg(Adapter, HW_VAR_FWLPS_RF_ON, &bFwPSAwake);
 #endif
 
 #ifdef CONFIG_P2P_PS
@@ -316,10 +291,7 @@ rtl8812_HalDmWatchDog(
 
 	if ((rtw_is_hw_init_completed(Adapter))
 	    && ((!bFwCurrentInPSMode) && bFwPSAwake)) {
-		/*  */
-		/* Calculate Tx/Rx statistics. */
-		/*  */
-		dm_CheckStatistics(Adapter);
+
 		rtw_hal_check_rxfifo_full(Adapter);
 		/*  */
 		/* Dynamically switch RTS/CTS protection. */
@@ -337,33 +309,10 @@ rtl8812_HalDmWatchDog(
 
 	}
 
-	/* ODM */
-	if (rtw_is_hw_init_completed(Adapter)) {
-		u8	bLinked = _FALSE;
-		u8	bsta_state = _FALSE;
-		u8	bBtDisabled = _TRUE;
-
 #ifdef CONFIG_DISABLE_ODM
-		pHalData->odmpriv.support_ability = 0;
+	goto skip_dm;
 #endif
-
-		if (rtw_mi_check_status(Adapter, MI_ASSOC)) {
-			bLinked = _TRUE;
-			if (rtw_mi_check_status(Adapter, MI_STA_LINKED))
-				bsta_state = _TRUE;
-		}
-
-		odm_cmn_info_update(&pHalData->odmpriv , ODM_CMNINFO_LINK, bLinked);
-		odm_cmn_info_update(&pHalData->odmpriv , ODM_CMNINFO_STATION_STATE, bsta_state);
-
-#ifdef CONFIG_BT_COEXIST
-		bBtDisabled = rtw_btcoex_IsBtDisabled(Adapter);
-#endif /* CONFIG_BT_COEXIST */
-		odm_cmn_info_update(&pHalData->odmpriv, ODM_CMNINFO_BT_ENABLED, ((bBtDisabled == _TRUE) ? _FALSE : _TRUE));
-
-		odm_dm_watchdog(&pHalData->odmpriv);
-
-	}
+	rtw_phydm_watchdog(Adapter);
 
 skip_dm:
 
@@ -388,8 +337,8 @@ void rtl8812_init_dm_priv(IN PADAPTER Adapter)
 	if (pHalData->EEPROMBluetoothCoexist == _FALSE)
 	#endif
 	{
-		pHalData->RegIQKFWOffload = 1;
-		rtw_sctx_init(&pHalData->iqk_sctx, 0);
+		if (IS_HARDWARE_TYPE_8821(Adapter))
+			pHalData->RegIQKFWOffload = 1;
 	}
 #endif
 

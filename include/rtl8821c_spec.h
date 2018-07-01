@@ -1,6 +1,6 @@
 /******************************************************************************
  *
- * Copyright(c) 2007 - 2016 Realtek Corporation. All rights reserved.
+ * Copyright(c) 2016 - 2017 Realtek Corporation.
  *
  * This program is free software; you can redistribute it and/or modify it
  * under the terms of version 2 of the GNU General Public License as
@@ -11,11 +11,7 @@
  * FITNESS FOR A PARTICULAR PURPOSE. See the GNU General Public License for
  * more details.
  *
- * You should have received a copy of the GNU General Public License along with
- * this program; if not, write to the Free Software Foundation, Inc.,
- * 51 Franklin Street, Fifth Floor, Boston, MA 02110, USA
- *
- *******************************************************************************/
+ *****************************************************************************/
 #ifndef __RTL8821C_SPEC_H__
 #define __RTL8821C_SPEC_H__
 
@@ -34,7 +30,6 @@
 #define REG_C2HEVT_CLEAR			0x1AF			/* hal_com.c */
 #define REG_BCN_CTRL_1				REG_BCN_CTRL_CLINT0_8821C/* hal_com.c */
 #define REG_TSFTR1					REG_FREERUN_CNT_8821C	/* hal_com.c */
-#define REG_RXFLTMAP2				REG_RXFLTMAP_8821C	/* rtw_mp.c */
 #define REG_WOWLAN_WAKE_REASON	0x01C7
 #define REG_GPIO_PIN_CTRL_2			REG_GPIO_EXT_CTRL_8821C
 

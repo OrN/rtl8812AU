@@ -1,6 +1,6 @@
 /******************************************************************************
  *
- * Copyright(c) 2007 - 2012 Realtek Corporation. All rights reserved.
+ * Copyright(c) 2007 - 2017 Realtek Corporation.
  *
  * This program is free software; you can redistribute it and/or modify it
  * under the terms of version 2 of the GNU General Public License as
@@ -11,12 +11,7 @@
  * FITNESS FOR A PARTICULAR PURPOSE. See the GNU General Public License for
  * more details.
  *
- * You should have received a copy of the GNU General Public License along with
- * this program; if not, write to the Free Software Foundation, Inc.,
- * 51 Franklin Street, Fifth Floor, Boston, MA 02110, USA
- *
- *
- ******************************************************************************/
+ *****************************************************************************/
 #ifndef __COMMON_C2H_H__
 #define __COMMON_C2H_H__
 
@@ -75,6 +70,7 @@ typedef enum _C2H_EVT {
 	C2H_DEFEATURE_DBG = 0x22,
 	C2H_CUSTOMER_STR_RPT = 0x24,
 	C2H_CUSTOMER_STR_RPT_2 = 0x25,
+	C2H_WLAN_INFO = 0x27,
 	C2H_DEFEATURE_RSVD = 0xFD,
 	C2H_EXTEND = 0xff,
 } C2H_EVT;
