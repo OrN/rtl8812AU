@@ -851,7 +851,7 @@ halrf_rf_lna_setting(
 #if ((RTL8821A_SUPPORT == 1) || (RTL8881A_SUPPORT == 1))
 		case ODM_RTL8881A:
 		case ODM_RTL8821:
-			//halrf_rf_lna_setting_8821a(p_dm, type);????
+			halrf_rf_lna_setting_8821a(p_dm, type);
 			break;
 #endif
 #if (RTL8822B_SUPPORT == 1)

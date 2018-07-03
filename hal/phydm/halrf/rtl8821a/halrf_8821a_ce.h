@@ -22,7 +22,10 @@
 #define __HAL_PHY_RF_8821A_H__
 
 /*--------------------------Define Parameters-------------------------------*/
-
+void halrf_rf_lna_setting_8821a(
+		struct PHY_DM_STRUCT	*p_dm,
+		enum phydm_lna_set type
+);
 void configure_txpower_track_8821a(
 	struct _TXPWRTRACK_CFG	*p_config
 	);

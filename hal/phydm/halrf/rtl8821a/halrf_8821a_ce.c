@@ -33,6 +33,40 @@
 /* 3============================================================
  * 3 Tx Power Tracking
  * 3============================================================ */
+void halrf_rf_lna_setting_8821a(
+		struct PHY_DM_STRUCT	*p_dm,
+		enum phydm_lna_set type
+)
+{
+	/*phydm_disable_lna*/
+	if (type == phydm_lna_disable) {
+		odm_set_rf_reg(p_dm, RF_PATH_A, 0xef, 0x80000, 0x1);
+		odm_set_rf_reg(p_dm, RF_PATH_A, 0x30, 0xfffff, 0x18000);	/*select Rx mode*/
+		odm_set_rf_reg(p_dm, RF_PATH_A, 0x31, 0xfffff, 0x3f7ff);
+		odm_set_rf_reg(p_dm, RF_PATH_A, 0x32, 0xfffff, 0xc22bf);	/*disable LNA*/
+		odm_set_rf_reg(p_dm, RF_PATH_A, 0xef, 0x80000, 0x0);
+		if (p_dm->rf_type > RF_1T1R) {
+			odm_set_rf_reg(p_dm, RF_PATH_B, 0xef, 0x80000, 0x1);
+			odm_set_rf_reg(p_dm, RF_PATH_B, 0x30, 0xfffff, 0x18000);	/*select Rx mode*/
+			odm_set_rf_reg(p_dm, RF_PATH_B, 0x31, 0xfffff, 0x3f7ff);
+			odm_set_rf_reg(p_dm, RF_PATH_B, 0x32, 0xfffff, 0xc22bf);	/*disable LNA*/
+			odm_set_rf_reg(p_dm, RF_PATH_B, 0xef, 0x80000, 0x0);
+		}
+	} else if (type == phydm_lna_enable) {
+		odm_set_rf_reg(p_dm, RF_PATH_A, 0xef, 0x80000, 0x1);
+		odm_set_rf_reg(p_dm, RF_PATH_A, 0x30, 0xfffff, 0x18000);	/*select Rx mode*/
+		odm_set_rf_reg(p_dm, RF_PATH_A, 0x31, 0xfffff, 0x3f7ff);
+		odm_set_rf_reg(p_dm, RF_PATH_A, 0x32, 0xfffff, 0xc26bf);	/*disable LNA*/
+		odm_set_rf_reg(p_dm, RF_PATH_A, 0xef, 0x80000, 0x0);
+		if (p_dm->rf_type > RF_1T1R) {
+			odm_set_rf_reg(p_dm, RF_PATH_B, 0xef, 0x80000, 0x1);
+			odm_set_rf_reg(p_dm, RF_PATH_B, 0x30, 0xfffff, 0x18000);	/*select Rx mode*/
+			odm_set_rf_reg(p_dm, RF_PATH_B, 0x31, 0xfffff, 0x3f7ff);
+			odm_set_rf_reg(p_dm, RF_PATH_B, 0x32, 0xfffff, 0xc26bf);	/*disable LNA*/
+			odm_set_rf_reg(p_dm, RF_PATH_B, 0xef, 0x80000, 0x0);
+		}
+	}
+}
 
 void odm_tx_pwr_track_set_pwr8821a(
 	void	*p_dm_void,
