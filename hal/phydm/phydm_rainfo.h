@@ -453,4 +453,14 @@ phydm_update_rate_id(
 
 #endif
 
+u8Byte
+PhyDM_Get_Rate_Bitmap_Ex(
+	IN	PVOID		pDM_VOID,
+	IN	u4Byte		macid,
+	IN	u8Byte		ra_mask,
+	IN	u1Byte		rssi_level,
+	OUT		u8Byte	*dm_RA_Mask,
+	OUT		u1Byte	*dm_RteID
+);
+
 #endif /*#ifndef	__ODMRAINFO_H__*/

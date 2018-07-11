@@ -1024,7 +1024,7 @@ init_UsbAggregationSetting_8812A(
  *	12/10/2010	MHC		Create Version 0.
  *
  *---------------------------------------------------------------------------*/
-VOID
+static VOID
 USB_AggModeSwitch(
 	IN	PADAPTER			Adapter
 )
@@ -1187,7 +1187,7 @@ HalDetectSelectiveSuspendMode(
 #endif
 }	/* HalDetectSelectiveSuspendMode */
 
-rt_rf_power_state RfOnOffDetect(IN	PADAPTER pAdapter)
+static rt_rf_power_state RfOnOffDetect(IN	PADAPTER pAdapter)
 {
 	HAL_DATA_TYPE		*pHalData = GET_HAL_DATA(pAdapter);
 	struct pwrctrl_priv *pwrctl = adapter_to_pwrctl(pAdapter);
@@ -1207,13 +1207,13 @@ rt_rf_power_state RfOnOffDetect(IN	PADAPTER pAdapter)
 	return rfpowerstate;
 }	/* HalDetectPwrDownMode */
 
-void _ps_open_RF(_adapter *padapter)
+static void _ps_open_RF(_adapter *padapter)
 {
 	/* here call with bRegSSPwrLvl 1, bRegSSPwrLvl 2 needs to be verified */
 	/* phy_SsPwrSwitch92CU(padapter, rf_on, 1); */
 }
 
-void _ps_close_RF(_adapter *padapter)
+static void _ps_close_RF(_adapter *padapter)
 {
 	/* here call with bRegSSPwrLvl 1, bRegSSPwrLvl 2 needs to be verified */
 	/* phy_SsPwrSwitch92CU(padapter, rf_off, 1); */

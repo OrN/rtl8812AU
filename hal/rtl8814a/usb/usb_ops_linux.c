@@ -15,10 +15,10 @@
 #define _HCI_OPS_OS_C_
 
 /* #include <drv_types.h> */
-#include <rtl8812a_hal.h>
+#include <rtl8814a_hal.h>
 
 #ifdef CONFIG_SUPPORT_USB_INT
-void interrupt_handler_8812au(_adapter *padapter, u16 pkt_len, u8 *pbuf)
+void interrupt_handler_8814au(_adapter *padapter, u16 pkt_len, u8 *pbuf)
 {
 	HAL_DATA_TYPE	*pHalData = GET_HAL_DATA(padapter);
 	struct reportpwrstate_parm pwr_rpt;
@@ -61,12 +61,13 @@ void interrupt_handler_8812au(_adapter *padapter, u16 pkt_len, u8 *pbuf)
 #ifdef CONFIG_INTERRUPT_BASED_TXBCN
 
 #ifdef CONFIG_INTERRUPT_BASED_TXBCN_EARLY_INT
-	if (pHalData->IntArray[0] & IMR_BCNDMAINT0_8812)/*only for BCN_0*/
+	if (pHalData->IntArray[0] & IMR_BCNDMAINT0_88E)
 #endif
 #ifdef CONFIG_INTERRUPT_BASED_TXBCN_BCN_OK_ERR
 		if (pHalData->IntArray[0] & (IMR_TBDER_88E | IMR_TBDOK_88E))
 #endif
 		{
+			struct mlme_priv *pmlmepriv = &padapter->mlmepriv;
 #if 0
 			if (pHalData->IntArray[0] & IMR_BCNDMAINT0_88E)
 				RTW_INFO("%s: HISR_BCNERLY_INT\n", __func__);
@@ -75,7 +76,29 @@ void interrupt_handler_8812au(_adapter *padapter, u16 pkt_len, u8 *pbuf)
 			if (pHalData->IntArray[0] & IMR_TBDER_88E)
 				RTW_INFO("%s: HISR_TXBCNERR\n", __func__);
 #endif /* 0 */
-			rtw_mi_set_tx_beacon_cmd(padapter);
+		
+
+			if(check_fwstate(pmlmepriv, WIFI_AP_STATE))
+			{
+				//send_beacon(padapter);
+				if(pmlmepriv->update_bcn == _TRUE)
+				{
+					//tx_beacon_hdl(padapter, NULL);
+					set_tx_beacon_cmd(padapter);
+				}
+			}
+#ifdef CONFIG_CONCURRENT_MODE
+			if(check_buddy_fwstate(padapter, WIFI_AP_STATE))
+			{
+				//send_beacon(padapter);
+				if(padapter->pbuddy_adapter->mlmepriv.update_bcn == _TRUE)
+				{
+					//tx_beacon_hdl(padapter, NULL);
+					set_tx_beacon_cmd(padapter->pbuddy_adapter);
+				}
+			}
+#endif
+
 		}
 #endif /* CONFIG_INTERRUPT_BASED_TXBCN */
 
@@ -127,7 +150,7 @@ int recvbuf2recvframe(PADAPTER padapter, void *ptr)
 
 
 #ifdef CONFIG_USB_RX_AGGREGATION
-	pkt_cnt = GET_RX_STATUS_DESC_USB_AGG_PKTNUM_8812(pbuf);
+	pkt_cnt = GET_RX_STATUS_DESC_DMA_AGG_NUM_8814A(pbuf);
 #endif
 
 	do {
@@ -141,7 +164,7 @@ int recvbuf2recvframe(PADAPTER padapter, void *ptr)
 		precvframe->u.hdr.precvbuf = NULL;	/* can't access the precvbuf for new arch. */
 		precvframe->u.hdr.len = 0;
 
-		rtl8812_query_rx_desc_status(precvframe, pbuf);
+		rtl8814_query_rx_desc_status(precvframe, pbuf);
 
 		pattrib = &precvframe->u.hdr.attrib;
 
@@ -161,9 +184,8 @@ int recvbuf2recvframe(PADAPTER padapter, void *ptr)
 		}
 
 #ifdef CONFIG_RX_PACKET_APPEND_FCS
-		if (check_fwstate(&padapter->mlmepriv, WIFI_MONITOR_STATE) == _FALSE)
-			if ((pattrib->pkt_rpt_type == NORMAL_RX) && rtw_hal_rcr_check(padapter, RCR_APPFCS))
-				pattrib->pkt_len -= IEEE80211_FCS_LEN;
+		if(pattrib->pkt_rpt_type == NORMAL_RX)
+			pattrib->pkt_len -= IEEE80211_FCS_LEN;
 #endif
 		if (rtw_os_alloc_recvframe(padapter, precvframe,
 			(pbuf + pattrib->shift_sz + pattrib->drvinfo_sz + RXDESC_SIZE), pskb) == _FAIL) {
@@ -175,20 +197,36 @@ int recvbuf2recvframe(PADAPTER padapter, void *ptr)
 		recvframe_put(precvframe, pattrib->pkt_len);
 		/* recvframe_pull(precvframe, drvinfo_sz + RXDESC_SIZE); */
 
-		if (pattrib->pkt_rpt_type == NORMAL_RX) /* Normal rx packet */
-			pre_recv_entry(precvframe, pattrib->physt ? (pbuf + RXDESC_OFFSET) : NULL);
-		else { /* pkt_rpt_type == TX_REPORT1-CCX, TX_REPORT2-TX RTP,HIS_REPORT-USB HISR RTP */
+		if(pattrib->pkt_rpt_type == NORMAL_RX)//Normal rx packet
+		{
+			if(pattrib->physt)
+				pphy_status = (pbuf + RXDESC_OFFSET);
+
+#ifdef CONFIG_CONCURRENT_MODE
+			if(rtw_buddy_adapter_up(padapter))
+			{
+				if(pre_recv_entry(precvframe, pphy_status) != _SUCCESS)
+				{
+					RT_TRACE(_module_rtl871x_recv_c_,_drv_err_,
+						("recvbuf2recvframe: recv_entry(precvframe) != _SUCCESS\n"));
+				}
+			}
+#endif //CONFIG_CONCURRENT_MODE
+
+			if(pattrib->physt && pphy_status)
+				rx_query_phy_status(precvframe, pphy_status);
+
+			if(rtw_recv_entry(precvframe) != _SUCCESS)
+			{
+				RT_TRACE(_module_rtl871x_recv_c_,_drv_err_,
+					("recvbuf2recvframe: rtw_recv_entry(precvframe) != _SUCCESS\n"));
+			}
+
+		}
+		else{ // pkt_rpt_type == TX_REPORT1-CCX, TX_REPORT2-TX RTP,HIS_REPORT-USB HISR RTP
 			if (pattrib->pkt_rpt_type == C2H_PACKET) {
-				/*RTW_INFO("rx C2H_PACKET\n");*/
-				rtw_hal_c2h_pkt_pre_hdl(padapter, precvframe->u.hdr.rx_data, pattrib->pkt_len);
-			} else if (pattrib->pkt_rpt_type == HIS_REPORT) {
-				/*RTW_INFO("%s rx USB HISR\n", __func__);*/
-#ifdef CONFIG_SUPPORT_USB_INT
-#if ((RTL8812A_SUPPORT == 1) || (RTL8821A_SUPPORT == 1))
-			if (p_dm->support_ic_type & (ODM_RTL8812A | ODM_RTL8821A))
-				interrupt_handler_8812au(padapter, pattrib->pkt_len, precvframe->u.hdr.rx_data);
-#endif
-#endif
+				//RTW_INFO("rx C2H_PACKET \n");
+				rtw_hal_c2h_pkt_pre_hdl(padapter,precvframe->u.hdr.rx_data,pattrib->pkt_len);
 			}
 			rtw_free_recvframe(precvframe, pfree_recv_queue);
 		}
@@ -210,14 +248,16 @@ _exit_recvbuf2recvframe:
 }
 #endif
 
-void rtl8812au_xmit_tasklet(void *priv)
-{
+void rtl8814au_xmit_tasklet(void *priv)
+{	
 	int ret = _FALSE;
-	_adapter *padapter = (_adapter *)priv;
+	_adapter *padapter = (_adapter*)priv;
 	struct xmit_priv *pxmitpriv = &padapter->xmitpriv;
 
-	while (1) {
-		if (RTW_CANNOT_TX(padapter)) {
+	while(1)
+	{
+		if (RTW_CANNOT_TX(padapter))
+		{
 			RTW_INFO("xmit_tasklet => bDriverStopped or bSurpriseRemoved or bWritePortCancel\n");
 			break;
 		}
@@ -225,23 +265,50 @@ void rtl8812au_xmit_tasklet(void *priv)
 		if (rtw_xmit_ac_blocked(padapter) == _TRUE)
 			break;
 
-		ret = rtl8812au_xmitframe_complete(padapter, pxmitpriv, NULL);
+		ret = rtl8814au_xmitframe_complete(padapter, pxmitpriv, NULL);
 
-		if (ret == _FALSE)
+		if(ret==_FALSE)
 			break;
-
+		
 	}
+	
+}
+
+void rtl8814au_set_intf_ops(struct _io_ops	*pops)
+{		
+	_rtw_memset((u8 *)pops, 0, sizeof(struct _io_ops));	
+
+	pops->_read8 = &usb_read8;
+	pops->_read16 = &usb_read16;
+	pops->_read32 = &usb_read32;
+	pops->_read_mem = &usb_read_mem;
+	pops->_read_port = &usb_read_port;	
+	
+	pops->_write8 = &usb_write8;
+	pops->_write16 = &usb_write16;
+	pops->_write32 = &usb_write32;
+	pops->_writeN = &usb_writeN;
+	
+#ifdef CONFIG_USB_SUPPORT_ASYNC_VDN_REQ	
+	pops->_write8_async= &usb_async_write8;
+	pops->_write16_async = &usb_async_write16;
+	pops->_write32_async = &usb_async_write32;
+#endif	
+	pops->_write_mem = &usb_write_mem;
+	pops->_write_port = &usb_write_port;
+
+	pops->_read_port_cancel = &usb_read_port_cancel;
+	pops->_write_port_cancel = &usb_write_port_cancel;
+
+#ifdef CONFIG_USB_INTERRUPT_IN_PIPE
+	pops->_read_interrupt = &usb_read_interrupt;
+#endif
 
 }
 
-void rtl8812au_set_hw_type(struct dvobj_priv *pdvobj)
+void rtl8814au_set_hw_type(struct dvobj_priv *pdvobj)
 {
-	if (pdvobj->chip_type == RTL8812) {
-		pdvobj->HardwareType = HARDWARE_TYPE_RTL8812AU;
-		RTW_INFO("CHIP TYPE: RTL8812\n");
-	} else if (pdvobj->chip_type == RTL8821) {
-		/*pdvobj->HardwareType = HARDWARE_TYPE_RTL8811AU;	*/
-		pdvobj->HardwareType = HARDWARE_TYPE_RTL8821U;
-		RTW_INFO("CHIP TYPE: RTL8811AU or RTL8821U\n");
-	}
+	pdvobj->HardwareType = HARDWARE_TYPE_RTL8814AU;
+	RTW_INFO("CHIP TYPE: RTL8814\n");
 }
+

@@ -2061,6 +2061,142 @@ phydm_ra_dynamic_rate_id_init(
 	}
 }
 
+u8Byte
+PhyDM_Get_Rate_Bitmap_Ex(
+	IN	PVOID		pDM_VOID,
+	IN	u4Byte		macid,
+	IN	u8Byte		ra_mask,
+	IN	u1Byte		rssi_level,
+	OUT		u8Byte	*dm_RA_Mask,
+	OUT		u1Byte	*dm_RteID
+)
+{
+	struct PHY_DM_STRUCT	*pDM_Odm = (struct PHY_DM_STRUCT	*)pDM_VOID;
+	PSTA_INFO_T	pEntry;
+	u8Byte	rate_bitmap = 0;
+	u1Byte	WirelessMode;
+
+	pEntry = pDM_Odm->pODM_StaInfo[macid];
+	if (!IS_STA_VALID(pEntry))
+		return ra_mask;
+	WirelessMode = pEntry->wireless_mode;
+	switch (WirelessMode) {
+	case ODM_WM_B:
+		if (ra_mask & 0x000000000000000c) /* 11M or 5.5M enable */
+			rate_bitmap = 0x000000000000000d;
+		else
+			rate_bitmap = 0x000000000000000f;
+		break;
+
+	case (ODM_WM_G):
+	case (ODM_WM_A):
+		if (rssi_level == DM_RATR_STA_HIGH)
+			rate_bitmap = 0x0000000000000f00;
+		else
+			rate_bitmap = 0x0000000000000ff0;
+		break;
+
+	case (ODM_WM_B|ODM_WM_G):
+		if (rssi_level == DM_RATR_STA_HIGH)
+			rate_bitmap = 0x0000000000000f00;
+		else if (rssi_level == DM_RATR_STA_MIDDLE)
+			rate_bitmap = 0x0000000000000ff0;
+		else
+			rate_bitmap = 0x0000000000000ff5;
+		break;
+
+	case (ODM_WM_B|ODM_WM_G|ODM_WM_N24G):
+	case (ODM_WM_B|ODM_WM_N24G):
+	case (ODM_WM_G|ODM_WM_N24G):
+	case (ODM_WM_A|ODM_WM_N5G): {
+		if (pDM_Odm->RFType == ODM_1T2R || pDM_Odm->RFType == ODM_1T1R) {
+			if (rssi_level == DM_RATR_STA_HIGH)
+				rate_bitmap = 0x00000000000f0000;
+			else if (rssi_level == DM_RATR_STA_MIDDLE)
+				rate_bitmap = 0x00000000000ff000;
+			else {
+				if (*(pDM_Odm->pBandWidth) == ODM_BW40M)
+					rate_bitmap = 0x00000000000ff015;
+				else
+					rate_bitmap = 0x00000000000ff005;
+			}
+		} else if (pDM_Odm->RFType == ODM_2T2R  || pDM_Odm->RFType == ODM_2T3R  || pDM_Odm->RFType == ODM_2T4R) {
+			if (rssi_level == DM_RATR_STA_HIGH)
+				rate_bitmap = 0x000000000f8f0000;
+			else if (rssi_level == DM_RATR_STA_MIDDLE)
+				rate_bitmap = 0x000000000f8ff000;
+			else {
+				if (*(pDM_Odm->pBandWidth) == ODM_BW40M)
+					rate_bitmap = 0x000000000f8ff015;
+				else
+					rate_bitmap = 0x000000000f8ff005;
+			}
+		} else {
+			if (rssi_level == DM_RATR_STA_HIGH)
+				rate_bitmap = 0x0000000f0f0f0000;
+			else if (rssi_level == DM_RATR_STA_MIDDLE)
+				rate_bitmap = 0x0000000fcfcfe000;
+			else {
+				if (*(pDM_Odm->pBandWidth) == ODM_BW40M)
+					rate_bitmap = 0x0000000ffffff015;
+				else
+					rate_bitmap = 0x0000000ffffff005;
+			}
+		}
+	}
+	break;
+
+	case (ODM_WM_AC|ODM_WM_G):
+		if (rssi_level == 1)
+			rate_bitmap = 0x00000000fc3f0000;
+		else if (rssi_level == 2)
+			rate_bitmap = 0x00000000fffff000;
+		else
+			rate_bitmap = 0x00000000ffffffff;
+		break;
+
+	case (ODM_WM_AC|ODM_WM_A):
+
+		if (pDM_Odm->RFType == ODM_1T2R || pDM_Odm->RFType == ODM_1T1R) {
+			if (rssi_level == 1)				/* add by Gary for ac-series */
+				rate_bitmap = 0x00000000003f8000;
+			else if (rssi_level == 2)
+				rate_bitmap = 0x00000000003fe000;
+			else
+				rate_bitmap = 0x00000000003ff010;
+		} else if (pDM_Odm->RFType == ODM_2T2R  || pDM_Odm->RFType == ODM_2T3R  || pDM_Odm->RFType == ODM_2T4R) {
+			if (rssi_level == 1)				/* add by Gary for ac-series */
+				rate_bitmap = 0x00000000fe3f8000;       /* VHT 2SS MCS3~9 */
+			else if (rssi_level == 2)
+				rate_bitmap = 0x00000000fffff000;       /* VHT 2SS MCS0~9 */
+			else
+				rate_bitmap = 0x00000000fffff010;       /* All */
+		} else {
+			if (rssi_level == 1)				/* add by Gary for ac-series */
+				rate_bitmap = 0x000003f8fe3f8000ULL;       /* VHT 3SS MCS3~9 */
+			else if (rssi_level == 2)
+				rate_bitmap = 0x000003fffffff000ULL;       /* VHT3SS MCS0~9 */
+			else
+				rate_bitmap = 0x000003fffffff010ULL;       /* All */
+		}
+		break;
+
+	default:
+		if (pDM_Odm->RFType == ODM_1T2R || pDM_Odm->RFType == ODM_1T1R)
+			rate_bitmap = 0x00000000000fffff;
+		else if (pDM_Odm->RFType == ODM_2T2R  || pDM_Odm->RFType == ODM_2T3R  || pDM_Odm->RFType == ODM_2T4R)
+			rate_bitmap = 0x000000000fffffff;
+		else
+			rate_bitmap = 0x0000003fffffffffULL;
+		break;
+
+	}
+	ODM_RT_TRACE(pDM_Odm, ODM_COMP_RA_MASK, ODM_DBG_LOUD, (" ==> rssi_level:0x%02x, WirelessMode:0x%02x, rate_bitmap:0x%016llx\n", rssi_level, WirelessMode, rate_bitmap));
+
+	return (ra_mask & rate_bitmap);
+}
+
+
 void
 phydm_update_rate_id(
 	void	*p_dm_void,
