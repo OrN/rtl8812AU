@@ -10322,13 +10322,16 @@ int hal_config_macaddr(_adapter *adapter, bool autoload_fail)
 	u8 *hw_addr = NULL;
 	int ret = _SUCCESS;
 
-	if (autoload_fail)
-		goto bypass_hw_pg;
-
 	if (addr_offset != -1)
 		hw_addr = &hal_data->efuse_eeprom_data[addr_offset];
 
 #ifdef CONFIG_EFUSE_CONFIG_FILE
+	/* check wifi mac file */
+	if (Hal_ReadMACAddrFromFile(adapter, addr) == _SUCCESS) {
+		_rtw_memcpy(hal_data->EEPROMMACAddr, addr, ETH_ALEN);
+		goto exit;
+	}
+
 	/* if the hw_addr is written by efuse file, set to NULL */
 	if (hal_data->efuse_file_status == EFUSE_FILE_LOADED)
 		hw_addr = NULL;
@@ -10345,16 +10348,6 @@ int hal_config_macaddr(_adapter *adapter, bool autoload_fail)
 		_rtw_memcpy(hal_data->EEPROMMACAddr, hw_addr, ETH_ALEN);
 		goto exit;
 	}
-
-bypass_hw_pg:
-
-#ifdef CONFIG_EFUSE_CONFIG_FILE
-	/* check wifi mac file */
-	if (Hal_ReadMACAddrFromFile(adapter, addr) == _SUCCESS) {
-		_rtw_memcpy(hal_data->EEPROMMACAddr, addr, ETH_ALEN);
-		goto exit;
-	}
-#endif
 
 	_rtw_memset(hal_data->EEPROMMACAddr, 0, ETH_ALEN);
 	ret = _FAIL;
