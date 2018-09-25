@@ -22,7 +22,7 @@
 #include "mp_precomp.h"
 #include "../phydm_precomp.h"
 
-#if (RTL8812A_SUPPORT == 1)
+#if (RTL8821A_SUPPORT == 1)
 static boolean
 check_positive(
 	struct PHY_DM_STRUCT     *p_dm_odm,
